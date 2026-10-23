@@ -1,0 +1,19 @@
+# 别人的/自有仓库的目录，不纳入本仓库
+/Rime/
+/MacOS_wubi98/
+
+# 下载的 librime 发布包
+/rime-test/vendor/
+
+# 复制出来的用户目录副本（含部署产物 build/）
+/rime-test/user-*/
+
+# 编译产物
+/rime-test/bin/
+build/
+*.o
+
+.DS_Store
+
+# 测试运行日志
+/rime-test/logs/
