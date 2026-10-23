@@ -1,4 +1,5 @@
 patch:
+  "style/font_face": "98WB-V,98WB-U"
   "style/text_orientation": horizontal
   "style/fullscreen": false
   "style/inline_preedit": false

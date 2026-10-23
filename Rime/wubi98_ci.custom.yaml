@@ -1,5 +1,6 @@
 patch:
   keyboard_layout: default
+  "style/font_face": "98WB-0"
   "style/text_orientation": horizontal
   "style/fullscreen": false
   "style/inline_preedit": false
