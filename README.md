@@ -88,8 +88,12 @@ rime-test/               隔离的 librime 测试环境
 
 ## 跑测试
 
+测试只能在 macOS 上运行：映射表由系统键盘布局接口（Carbon 的
+`UCKeyTranslate`）实测生成，`run_case.sh` 克隆用户目录用的 `cp -c` 依赖 APFS。
+
 测试环境不依赖系统里安装的鼠须管，使用与鼠须管 1.1.2 相同版本的
-librime 1.16.0（a251145）官方发布包，带 librime-lua 插件。
+librime 1.16.0（a251145）官方发布包，带 librime-lua 插件。发布包不在仓库里，
+需要按下面第 1 步另外下载。
 
 1. 下载 [librime 1.16.0 发布页](https://github.com/rime/librime/releases/tag/1.16.0)
    里的 `rime-a251145-macOS-universal.tar.bz2`，解压到 `rime-test/vendor/`：
@@ -147,8 +151,9 @@ rime-test/bin/rime_dvtest --shared rime-test/shared --user rime-test/user-dv --d
   见 `Rime/lua/helper.lua`）。`Rime/` 取自我在用的鼠须管用户目录，
   与资源库当前发布的安装包版本不完全相同；除下面列出的德沃夏克改动外，
   本仓库没有修改这些文件。
-- `rime-test/shared/` 下的文件来自 [rime-prelude](https://github.com/rime/rime-prelude)
-  （提交 db691d2）。
+- `rime-test/shared/` 取自 [rime/rime-prelude](https://github.com/rime/rime-prelude)
+  （提交 db691d2，LGPL-3.0）。
 - 本仓库新增的是德沃夏克映射（`Rime/lua/dvorak_remap.lua`、
   `Rime/wubi98_ci.custom.yaml` 里的挂载行、`Rime/squirrel.custom.yaml` 的
   `keyboard_layout`）和 `rime-test/` 测试环境。
+- 原作者的码表、配置和 lua 版权归原作者所有，本仓库新增部分为德沃夏克映射和测试环境。
