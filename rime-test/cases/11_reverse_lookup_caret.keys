@@ -1,0 +1,8 @@
+# 拼音反查里移动光标后打字母：光标在 z 之后时字母进拼音，移到 z 之前时进五笔。
+#   zai 光标左移到 z 之后插 b，成 zbai，End 回末尾选第一候选（白）；
+#   zbai 光标移到开头后插 gg，gg 进的是五笔（五，词典 gg），空格选定五，bai 留在编码区。
+# 拼音 bai、ai 由 py 词典中挑出，五笔编码由 wubi98_ci 词典中挑出。
+# 本文件是 QWERTY 一侧，写 librime 应当收到的字符；德沃夏克一侧见 .dv.keys
+z a i Left b End space
+z b a i Home g g space
+Escape Escape

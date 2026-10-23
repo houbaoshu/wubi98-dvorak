@@ -1,0 +1,7 @@
+# 符号输入里移动光标后打字母：只有光标之前的编码是 / 加字母时，字母才进符号代码。
+#   /z 光标左移一格后插 s，成 /sz（骰子，⚀ …），End 回末尾选第一候选；
+#   /fs 光标移到开头后插 g，g 进的是五笔（一，词典 g），End 时连同 ⅟ 上屏。
+# 代码由 symbols.yaml 中挑出，五笔编码由 wubi98_ci 词典中挑出。
+# 本文件是 QWERTY 一侧，写 librime 应当收到的字符；德沃夏克一侧见 .dv.keys
+slash z Left s End 1
+slash f s Home g End

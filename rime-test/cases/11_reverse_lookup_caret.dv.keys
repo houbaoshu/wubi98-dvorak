@@ -1,0 +1,9 @@
+# 德沃夏克一侧，按物理键写：
+#   物理 z -> ;（编码区为空，转换成 z 进入反查）
+#   物理 a g -> 德沃夏克 a i，反查里原样
+#   Left 后光标在 z 之后，物理 n -> 德沃夏克 b，原样
+#   物理 n a g -> 德沃夏克 b a i，原样
+#   Home 后光标在 z 之前，物理 g g -> 德沃夏克 i i，转换回 g g
+z a g Left n End space
+z n a g Home g g space
+Escape Escape

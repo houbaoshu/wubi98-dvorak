@@ -1,0 +1,7 @@
+# 德沃夏克一侧，按物理键写：
+#   物理 / -> z：编码区为空，转换成 / 进入符号输入；再按一次在符号输入里，z 原样
+#   Left 后光标前是 /，物理 ; -> 德沃夏克 s，原样
+#   物理 y ; -> 德沃夏克 f s，原样
+#   Home 后光标前没有编码，物理 g -> 德沃夏克 i，转换回 g
+slash slash Left semicolon End 1
+slash y semicolon Home g End
