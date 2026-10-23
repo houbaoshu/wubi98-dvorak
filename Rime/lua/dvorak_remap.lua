@@ -1,14 +1,18 @@
 -- dvorak_remap.lua
 -- 把德沃夏克布局产生的字符按物理键位置换回 QWERTY 字符，再交给引擎重新处理，
--- 使中文模式下按物理 QWERTY 位置打五笔；英文模式由前面的 ascii_composer 先处理，
+-- 使中文模式下按物理 QWERTY 位置打五笔；英文模式（ascii_mode）不转换，
 -- 保持德沃夏克。
 --
--- 挂载（wubi98_ci.custom.yaml）：
---   "engine/processors/@after 0": "lua_processor@*dvorak_remap"
+-- 挂载（wubi98_ci.custom.yaml），排在所有处理器之前：
+--   "engine/processors/@before 0": "lua_processor@*dvorak_remap"
+-- 每个键都由本处理器在重发保护下重发一次（需要时先换成 QWERTY 字符），
+-- 后面的处理器（含 ascii_composer）只在重发那一层看到这个键。下游合成再重发
+-- 的键（如 key_binder 把 KP_Decimal 换成 period）也在保护之下，不会被当成
+-- 德沃夏克字符再转换一次。
 -- 测试见 rime-test/tools/check_dv.sh（由 make_users.sh 从 Rime/ 生成测试目录）。
 --
 -- 只转换无修饰键和只带 Shift 的键；带 Ctrl/Alt/Super/Lock 等其他修饰、
--- 以及按键松开事件，原样放行。
+-- 以及按键松开事件，不转换，原样重发。
 --
 -- 拼音反查（z 前缀，affix_segmentor@rvlk1）里按德沃夏克字母拼拼音：
 -- 字母原样放行；; ' , . 及其 Shift 层（换算结果是 QWERTY 字母）也原样放行，
@@ -123,10 +127,9 @@ local function segment_before_caret(context)
   return seg
 end
 
--- 光标之前是拼音反查段：刚按 z 时带 rvlk1_prefix，拼音字母段带 rvlk1。
-local function in_reverse_lookup(context)
-  local seg = segment_before_caret(context)
-  return seg ~= nil and (seg:has_tag("rvlk1") or seg:has_tag("rvlk1_prefix"))
+-- 光标之前的段是拼音反查段：刚按 z 时带 rvlk1_prefix，拼音字母段带 rvlk1。
+local function in_reverse_lookup(seg)
+  return seg:has_tag("rvlk1") or seg:has_tag("rvlk1_prefix")
 end
 
 -- 光标之前是符号输入：光标之前的最后一段带 punct 标签，且光标之前的编码是
@@ -135,9 +138,8 @@ end
 -- 这条规则是照 wubi98_ci.schema.yaml 的 recognizer/patterns/punct
 -- （^/([0-9]0?|[A-Za-z]+)$）手写的：只有这时下一个字母才会被收进符号代码。
 -- 改那条 pattern 时要同步改这里。
-local function in_symbols(context)
-  local seg = segment_before_caret(context)
-  return seg ~= nil and seg:has_tag("punct") and
+local function in_symbols(context, seg)
+  return seg:has_tag("punct") and
          context.input:sub(1, context.caret_pos):match("^/[A-Za-z]*$") ~= nil
 end
 
@@ -145,26 +147,35 @@ local function init(env)
   env.redispatching = false
 end
 
-local function func(key, env)
-  -- 重发出去的那一层：直接放行，交给后面的处理器。
-  if env.redispatching then
-    return kNoop
-  end
-  if key:release() or (key.modifier & ~kShiftMask) ~= 0 then
-    return kNoop
+-- 返回要重发的 QWERTY 键；不转换时返回 nil。
+local function convert(key, context)
+  if key:release() or (key.modifier & ~kShiftMask) ~= 0 or
+     context:get_option("ascii_mode") then
+    return nil
   end
   local qwerty = DVORAK_TO_QWERTY[key.keycode]
   if not qwerty then
+    return nil
+  end
+  if is_letter(key.keycode) or is_letter(qwerty) then
+    local seg = segment_before_caret(context)
+    if seg and (in_reverse_lookup(seg) or in_symbols(context, seg)) then
+      return nil
+    end
+  end
+  return KeyEvent(qwerty, key.modifier)
+end
+
+local function func(key, env)
+  -- 重发出去的那一层，以及下游在这一层里合成再重发的键：直接放行，
+  -- 交给后面的处理器。
+  if env.redispatching then
     return kNoop
   end
-  if (is_letter(key.keycode) or is_letter(qwerty)) and
-     (in_reverse_lookup(env.engine.context) or
-      in_symbols(env.engine.context)) then
-    return kNoop
-  end
+  local engine = env.engine
   env.redispatching = true
-  local ok, handled = pcall(env.engine.process_key, env.engine,
-                            KeyEvent(qwerty, key.modifier))
+  local ok, handled = pcall(engine.process_key, engine,
+                            convert(key, engine.context) or key)
   env.redispatching = false
   if not ok then
     error(handled)

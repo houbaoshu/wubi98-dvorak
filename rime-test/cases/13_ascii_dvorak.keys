@@ -1,0 +1,10 @@
+# 英文模式保持德沃夏克：Shift_L 单击切到英文后打字母，字母不转换。
+#   编码区为空时：s 不处理，交给应用；
+#   切回中文打 a，再按 Shift_L 进临时英文（switch_key Shift_L: inline_ascii），
+#   s 进编码区，成 as。
+# 本文件是 QWERTY 一侧；德沃夏克一侧见 .dv.keys，按的是德沃夏克布局下打出 s
+# 的物理键，两侧收到同一个字符。若英文模式也按物理位置转换，德沃夏克一侧
+# 编码区会变成 a;。期望的编码区写在 13_ascii_dvorak.expect。
+Shift+Shift_L Release+Shift_L s
+Shift+Shift_L Release+Shift_L
+a Shift+Shift_L Release+Shift_L s

@@ -7,13 +7,15 @@
 # 若有同名的 <用例>.expect，其中每行（# 开头的除外）还必须作为整行出现在
 # 两侧的输出里，用来核对结果本身对不对（两侧一致但都错时也能发现）。
 # 结果写到 logs/<用例>.base.out|err 和 logs/<用例>.dv.out|err。
-# 先用 make_users.sh 从 ../Rime 重新生成两个用户目录，测的总是 Rime/ 当前的配置；
+# 先用 build.sh 重新编译驱动和生成器（改过 tools/ 下的源码也不会测到旧程序），
+# 再用 make_users.sh 从 ../Rime 重新生成两个用户目录，测的总是 Rime/ 当前的配置；
 # 运行前后核对两个用户目录没有被用例改动（用例应在临时克隆里运行）。
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 base="$here/user-base"
 dv="$here/user-dv"
 
+"$here/tools/build.sh"
 "$here/tools/make_users.sh"
 
 snapshot() {
@@ -32,12 +34,17 @@ for keys in "$here"/cases/*.keys; do
   n=$(basename "$keys" .keys)
   dv_keys="$here/cases/$n.dv.keys"
   [ -f "$dv_keys" ] || dv_keys=$keys
-  # 某一侧运行出错（如键名写错）时报出用例名，继续跑其余用例。
-  if ! "$here/tools/run_case.sh" "$base" "$keys" \
-         > "$here/logs/$n.base.out" 2> "$here/logs/$n.base.err" ||
-     ! "$here/tools/run_case.sh" "$dv" "$dv_keys" --dvorak \
-         > "$here/logs/$n.dv.out" 2> "$here/logs/$n.dv.err"; then
-    echo "${n}: 运行失败，见 logs/$n.base.err 和 logs/$n.dv.err"
+  # 两侧都跑，各自记退出码，日志都是这一轮的。某一侧运行出错（如键名写错）
+  # 时报出用例名和出错的一侧，继续跑其余用例。
+  bad=""
+  "$here/tools/run_case.sh" "$base" "$keys" \
+    > "$here/logs/$n.base.out" 2> "$here/logs/$n.base.err" ||
+    bad="$bad logs/$n.base.err"
+  "$here/tools/run_case.sh" "$dv" "$dv_keys" --dvorak \
+    > "$here/logs/$n.dv.out" 2> "$here/logs/$n.dv.err" ||
+    bad="$bad logs/$n.dv.err"
+  if [ -n "$bad" ]; then
+    echo "${n}: 运行失败，见$bad"
     failed=1
     continue
   fi

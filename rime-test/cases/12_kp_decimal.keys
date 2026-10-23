@@ -1,0 +1,4 @@
+# 小键盘小数点：编码区有编码时，key_binder 把 KP_Decimal 换成 period 重发。
+# 重发的 period 是下游合成的，不是德沃夏克字符，不应再按物理位置转换成 e。
+# 编码 a（工）由 wubi98_ci 词典中挑出；期望的上屏写在 12_kp_decimal.expect。
+a KP_Decimal

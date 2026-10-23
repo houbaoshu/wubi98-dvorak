@@ -15,13 +15,15 @@
 
 - `squirrel.custom.yaml` 把 `keyboard_layout` 设为 `com.apple.keylayout.Dvorak`，
   鼠须管收到的是德沃夏克字符。
-- 英文模式（ascii_mode）由排在最前面的 `ascii_composer` 直接处理，
-  所以英文就是德沃夏克。
-- 中文模式下，`lua/dvorak_remap.lua` 这个 `lua_processor` 紧跟在
-  `ascii_composer` 之后：把德沃夏克字符换成同一物理键、同一 Shift 层的
-  QWERTY 字符，再交给引擎重新处理。于是按物理 QWERTY 键位打五笔。
+- `lua/dvorak_remap.lua` 这个 `lua_processor` 排在所有处理器之前，每个键都由它
+  重发一次给引擎，后面的处理器（含 `ascii_composer`）只在重发那一层看到这个键。
+  - 英文模式（ascii_mode）不转换，所以英文就是德沃夏克。
+  - 中文模式下，把德沃夏克字符换成同一物理键、同一 Shift 层的 QWERTY 字符
+    再重发。于是按物理 QWERTY 键位打五笔。
   - 只转换无修饰键和只带 Shift 的键；带 Ctrl/Alt/Command 等修饰的键、
-    按键松开事件原样放行。
+    按键松开事件不转换，原样重发。
+  - 重发期间下游合成再重发的键（如方案里 key_binder 把小键盘 `KP_Decimal`
+    换成 `period`）不会被当成德沃夏克字符再转换一次。
   - 拼音反查（`z` 前缀）里按德沃夏克字母拼拼音：字母原样放行，
     `; ' , .` 等换算后是 QWERTY 字母的键也原样放行，其余符号（翻页等）照旧转换。
   - 转换后的键引擎不处理时（例如五笔不接收的 Shift+字母），
@@ -32,8 +34,11 @@
 挂载只改了 `wubi98_ci` 方案（`wubi98_ci.custom.yaml` 里的一行）：
 
 ```yaml
-  "engine/processors/@after 0": "lua_processor@*dvorak_remap"
+  "engine/processors/@before 0": "lua_processor@*dvorak_remap"
 ```
+
+早先的版本挂在 `@after 0`（`ascii_composer` 之后）；手工合并过那一行的，
+要改成上面的 `@before 0`。
 
 ## 目录结构
 
