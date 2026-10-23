@@ -1,0 +1,7 @@
+# 繁简切换：先打一个词（简体上屏），Ctrl+Shift+4 打开 zh_trad，再打同一个词，上屏应转成繁体。
+# 期望的两次上屏写在 08_zh_trad.expect。
+# 编码 aaaj 由脚本从 wubi98_ci 词典中挑出（按词典顺序：4 码、该编码只有一条且是两字词、
+# 切到繁体后上屏文字改变的第一条）；繁体结果另在 luna_pinyin 词典（繁体）里核对有此词条。
+a a a j
+Control+Shift+4
+a a a j

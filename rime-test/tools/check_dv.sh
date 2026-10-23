@@ -4,6 +4,8 @@
 # 若有同名的 <用例>.dv.keys，德沃夏克一侧改用它（物理键与 QWERTY 一侧不同，
 # 如拼音反查里按德沃夏克字母敲）；这时去掉每键标题行里的键名、keycode 和
 # mask 再比较，其余输出必须完全一致。
+# 若有同名的 <用例>.expect，其中每行（# 开头的除外）还必须作为整行出现在
+# 两侧的输出里，用来核对结果本身对不对（两侧一致但都错时也能发现）。
 # 结果写到 logs/<用例>.base.out|err 和 logs/<用例>.dv.out|err。
 # 先用 make_users.sh 从 ../Rime 重新生成两个用户目录，测的总是 Rime/ 当前的配置；
 # 运行前后核对两个用户目录没有被用例改动（用例应在临时克隆里运行）。
@@ -50,6 +52,24 @@ for keys in "$here"/cases/*.keys; do
   fi
   if [ "$result" = "不一致" ]; then
     failed=1
+  fi
+  expect="$here/cases/$n.expect"
+  if [ -f "$expect" ]; then
+    missing=$(grep -v '^#' "$expect" | while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      for out in "$here/logs/$n.base.out" "$here/logs/$n.dv.out"; do
+        if ! grep -qFx -- "$line" "$out"; then
+          echo "$line"
+          break
+        fi
+      done
+    done)
+    if [ -n "$missing" ]; then
+      result="${result}，不符合 $n.expect，缺少：$(echo "$missing" | sed 's/^ *//' | paste -sd ' ' -)"
+      failed=1
+    else
+      result="${result}，符合 $n.expect"
+    fi
   fi
   if [ "$errors" != 0 ]; then
     failed=1
