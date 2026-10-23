@@ -42,7 +42,8 @@ Rime/                    Rime 用户目录的配置（部署到 ~/Library/Rime�
   lua/dvorak_remap.lua   德沃夏克 -> QWERTY 重映射（新增）
   wubi98_ci.custom.yaml  挂载上面的 lua_processor（新增一行）
   squirrel.custom.yaml   keyboard_layout 设为德沃夏克（改动）
-  其余文件               98 五笔的方案、码表、lua、opencc 等，本仓库未改动
+  其余文件               98 五笔的方案、码表、lua 等；为适配鼠须管 1.1.2 删改过的
+                         文件见“来源说明”
 rime-test/               隔离的 librime 测试环境
   tools/rime_dvtest.cc   测试驱动：加载 librime，逐键喂入并打印上屏/编码区/候选
   tools/gen_dvorak_map.c 用系统键盘布局实测生成映射表
@@ -146,11 +147,30 @@ rime-test/bin/rime_dvtest --shared rime-test/shared --user rime-test/user-dv --d
 ## 来源说明
 
 - 码表源自 yanhuacuo（见 `Rime/wubi98_ci.schema.yaml` 的说明）。
-- 其余方案配置、lua 脚本、opencc 数据等来自 98 五笔资源库
+- 其余方案配置、lua 脚本等来自 98 五笔资源库
   （官网 http://www.98wubi.com ，项目 https://github.com/98wb ，
   见 `Rime/lua/helper.lua`）。`Rime/` 取自我在用的鼠须管用户目录，
-  与资源库当前发布的安装包版本不完全相同；除下面列出的德沃夏克改动外，
-  本仓库没有修改这些文件。
+  与资源库当前发布的安装包版本不完全相同。除下面列出的德沃夏克改动外，
+  为适配鼠须管 1.1.2（librime 1.16.0）对原作者的文件做了这些删改：
+  - 删除 `opencc/` 下的 `s2t.json`、`STPhrases.ocd`、`STCharacters.ocd`、
+    `jiayin.json`、`jiayin.ocd`：旧版 OpenCC 的 `.ocd` 格式，librime 1.16.0
+    加载时会崩溃；繁简转换改用鼠须管自带的 `s2t.json`。
+  - 删除 `symbols.yaml`、`key_bindings.yaml`、`punctuation.yaml`：
+    rime-prelude 2019 年版的原样副本，放在用户目录里会挡住鼠须管自带的新版。
+  - 删除 `hot_keys.yaml`、`hot_keys.custom.yaml`，以及 `squirrel.custom.yaml`
+    里引用它们的 `__include`：按 Windows 进程名（`.exe`）写的 app_options，
+    在 macOS 上永远不生效。
+  - 删除没有被引用的 `lua/multiline.lua`。
+  - 去掉鼠须管不读的键：三个 `wubi98_*.custom.yaml` 里的 `style/fullscreen`、
+    `style/preedit_type`（小狼毫专用），`default.custom.yaml` 和
+    `wubi98_ci.custom.yaml` 里的 `keyboard_layout: default`。
+    `style/horizontal` 鼠须管也不读，但 `lua/new_spelling.lua` 会读，所以保留。
+  - `wubi98_ci.custom.yaml`、`wubi98_U.custom.yaml` 的 `style/font_face`
+    键名原来多写了冒号（`"style/font_face:"`），已改正；
+    `wubi98_ci.custom.yaml` 声明 `schema/dependencies: [py, wb_spelling]`。
+  - `lua/switcher.lua` 修了三处：数字键超出候选数时取到 nil 报错；
+    `key.ctrl()` 改为 `key:ctrl()`；设了 `menu/alternative_select_keys` 时
+    选择下标差 1。
 - `rime-test/shared/` 取自 [rime/rime-prelude](https://github.com/rime/rime-prelude)
   （提交 db691d2，LGPL-3.0）。
 - 本仓库新增的是德沃夏克映射（`Rime/lua/dvorak_remap.lua`、

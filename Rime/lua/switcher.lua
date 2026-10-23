@@ -15,7 +15,7 @@ local function select_index(key, env)
 
 	if select_keys ~= nil and select_keys ~= "" and not key:ctrl() and ch >= 0x20 and ch < 0x7f then
 		local pos = string.find(select_keys, string.char(ch))
-		if pos ~= nil then index = pos end
+		if pos ~= nil then index = pos - 1 end  -- string.find 从 1 开始，候选下标从 0 开始
 	elseif ch >= 0x30 and ch <= 0x39 then
 		index = (ch - 0x30 + 9) % 10
 	elseif ch >= 0xffb0 and ch < 0xffb9 then
