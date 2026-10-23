@@ -13,7 +13,7 @@ local function select_index(key, env)
 	local index = -1
 	local select_keys = env.engine.schema.select_keys
 
-	if select_keys ~= nil and select_keys ~= "" and not key.ctrl() and ch >= 0x20 and ch < 0x7f then
+	if select_keys ~= nil and select_keys ~= "" and not key:ctrl() and ch >= 0x20 and ch < 0x7f then
 		local pos = string.find(select_keys, string.char(ch))
 		if pos ~= nil then index = pos end
 	elseif ch >= 0x30 and ch <= 0x39 then
@@ -95,7 +95,8 @@ local function selector(key, env)
 		if candidate_count then
 			local last_candidate=selected_candidate.text
 			if key.keycode>0x2f and key.keycode<0x6a and idx>-1 then
-				last_candidate=segment:get_candidate_at(idx).text or ""
+				local cand=segment:get_candidate_at(idx)  -- 数字超出候选数时为 nil
+				last_candidate=cand and cand.text or ""
 			end
 			if context.input == rv_var.switch_schema and last_candidate and not trad_mode then	-- 控制关键字切换方案
 				local sc_id= IsExistChar(enable_schema_list,last_candidate)

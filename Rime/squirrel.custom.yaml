@@ -1,3 +1,2 @@
 patch:
-  __include: "hot_keys:/patch"
   "keyboard_layout": com.apple.keylayout.Dvorak

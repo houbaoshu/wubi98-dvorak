@@ -1,9 +1,7 @@
 patch:
   "style/font_face": "98WB-V,98WB-U"
   "style/text_orientation": horizontal
-  "style/fullscreen": false
   "style/inline_preedit": false
-  "style/preedit_type": composition
   "style/horizontal": false
   "style/candidate_list_layout": stacked
   "style/font_point": 18

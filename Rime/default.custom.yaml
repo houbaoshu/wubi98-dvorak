@@ -5,7 +5,6 @@ customization:
   modified_time: "Mon Jan  6 23:28:26 2020"
   rime_version: 1.7.1
 patch:
-  keyboard_layout: default
   schema_list:
     - {schema: wubi98_ci}
     - {schema: py}
