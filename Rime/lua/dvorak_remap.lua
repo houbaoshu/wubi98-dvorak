@@ -1,18 +1,19 @@
 -- dvorak_remap.lua
 -- 把德沃夏克布局产生的字符按物理键位置换回 QWERTY 字符，再交给引擎重新处理，
--- 使中文模式下按物理 QWERTY 位置打五笔；英文模式（ascii_mode）不转换，
+-- 使中文模式下按物理 QWERTY 位置打五笔；英文模式由前面的 ascii_composer 先处理，
 -- 保持德沃夏克。
 --
--- 挂载（wubi98_ci.custom.yaml），排在所有处理器之前：
---   "engine/processors/@before 0": "lua_processor@*dvorak_remap"
--- 每个键都由本处理器在重发保护下重发一次（需要时先换成 QWERTY 字符），
--- 后面的处理器（含 ascii_composer）只在重发那一层看到这个键。下游合成再重发
--- 的键（如 key_binder 把 KP_Decimal 换成 period）也在保护之下，不会被当成
--- 德沃夏克字符再转换一次。
+-- 挂载（wubi98_ci.custom.yaml）：
+--   "engine/processors/@after 0": "lua_processor@*dvorak_remap"
+-- 只重发转换过的键，其余键直接放行：不转换的键引擎不处理时，只在外层记一次
+-- 上屏历史（全部重发会记两次，挤占历史记录）。
+-- 放行的键若被下游绑定换成映射表里的字符再重发（如原方案里 KP_Decimal 发
+-- period），会被再转换一次，所以 wubi98_ci 删掉了那条绑定；加绑定时要避开
+-- 映射表里的字符。
 -- 测试见 rime-test/tools/check_dv.sh（由 make_users.sh 从 Rime/ 生成测试目录）。
 --
 -- 只转换无修饰键和只带 Shift 的键；带 Ctrl/Alt/Super/Lock 等其他修饰、
--- 以及按键松开事件，不转换，原样重发。
+-- 以及按键松开事件，原样放行。
 --
 -- 拼音反查（z 前缀，affix_segmentor@rvlk1）里按德沃夏克字母拼拼音：
 -- 字母原样放行；; ' , . 及其 Shift 层（换算结果是 QWERTY 字母）也原样放行，
@@ -150,8 +151,7 @@ end
 
 -- 返回要重发的 QWERTY 键；不转换时返回 nil。
 local function convert(key, context)
-  if key:release() or (key.modifier & ~kShiftMask) ~= 0 or
-     context:get_option("ascii_mode") then
+  if key:release() or (key.modifier & ~kShiftMask) ~= 0 then
     return nil
   end
   local qwerty = DVORAK_TO_QWERTY[key.keycode]
@@ -168,15 +168,17 @@ local function convert(key, context)
 end
 
 local function func(key, env)
-  -- 重发出去的那一层，以及下游在这一层里合成再重发的键：直接放行，
-  -- 交给后面的处理器。
+  -- 重发出去的那一层：直接放行，交给后面的处理器。
   if env.redispatching then
     return kNoop
   end
   local engine = env.engine
+  local qwerty = convert(key, engine.context)
+  if not qwerty then
+    return kNoop
+  end
   env.redispatching = true
-  local ok, handled = pcall(engine.process_key, engine,
-                            convert(key, engine.context) or key)
+  local ok, handled = pcall(engine.process_key, engine, qwerty)
   env.redispatching = false
   if not ok then
     error(handled)

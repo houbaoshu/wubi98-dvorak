@@ -15,15 +15,17 @@
 
 - `squirrel.custom.yaml` 把 `keyboard_layout` 设为 `com.apple.keylayout.Dvorak`，
   鼠须管收到的是德沃夏克字符。
-- `lua/dvorak_remap.lua` 这个 `lua_processor` 排在所有处理器之前，每个键都由它
-  重发一次给引擎，后面的处理器（含 `ascii_composer`）只在重发那一层看到这个键。
-  - 英文模式（ascii_mode）不转换，所以英文就是德沃夏克。
-  - 中文模式下，把德沃夏克字符换成同一物理键、同一 Shift 层的 QWERTY 字符
-    再重发。于是按物理 QWERTY 键位打五笔。
+- 英文模式（ascii_mode）由排在最前面的 `ascii_composer` 直接处理，
+  所以英文就是德沃夏克。
+- 中文模式下，`lua/dvorak_remap.lua` 这个 `lua_processor` 紧跟在
+  `ascii_composer` 之后：把德沃夏克字符换成同一物理键、同一 Shift 层的
+  QWERTY 字符，再交给引擎重新处理。于是按物理 QWERTY 键位打五笔。
   - 只转换无修饰键和只带 Shift 的键；带 Ctrl/Alt/Command 等修饰的键、
-    按键松开事件不转换，原样重发。
-  - 重发期间下游合成再重发的键（如方案里 key_binder 把小键盘 `KP_Decimal`
-    换成 `period`）不会被当成德沃夏克字符再转换一次。
+    按键松开事件原样放行。
+  - 下游绑定若把放行的键换成映射表里的字符再重发，重发的键会被再转换一次。
+    所以删掉了 `wubi98_ci.schema.yaml` 里小键盘 `KP_Decimal` 发 `period`
+    的绑定（否则编码中按小键盘小数点会变成编码 `e`）；编码中按小键盘小数点
+    现在交给应用。
   - 拼音反查（`z` 前缀）里按德沃夏克字母拼拼音：字母原样放行；
     `; ' , .` 及其 Shift 层（换算后是 QWERTY 字母）也原样放行，分别是选第二、
     第三候选和标点；其余符号（翻页等）照旧转换。
@@ -42,11 +44,10 @@
 挂载只改了 `wubi98_ci` 方案（`wubi98_ci.custom.yaml` 里的一行）：
 
 ```yaml
-  "engine/processors/@before 0": "lua_processor@*dvorak_remap"
+  "engine/processors/@after 0": "lua_processor@*dvorak_remap"
 ```
 
-早先的版本挂在 `@after 0`（`ascii_composer` 之后）；手工合并过那一行的，
-要改成上面的 `@before 0`。
+另外在 `wubi98_ci.schema.yaml` 里删了一行绑定，见上。
 
 ## 目录结构
 
@@ -117,6 +118,13 @@ rime-test/               隔离的 librime 测试环境
    如果你本地改过这两个 yaml，请手工合并：`wubi98_ci.custom.yaml` 的 `patch:`
    下加上面那行挂载，`squirrel.custom.yaml` 的 `patch:` 下设
    `"keyboard_layout": com.apple.keylayout.Dvorak`。
+
+   再删掉 `wubi98_ci.schema.yaml` 里小键盘小数点的绑定：
+
+   ```sh
+   sed -i '' '/{accept: KP_Decimal, send: period, when: composing}/d' \
+     ~/Library/Rime/wubi98_ci.schema.yaml
+   ```
 
 3. 在鼠须管菜单里选“重新部署”。
 4. 系统设置里输入源保留鼠须管即可，打英文用鼠须管的英文模式。
@@ -218,6 +226,9 @@ rime-test/tools/run_case.sh rime-test/user-dv /dev/null --dvorak a a a b
   - `wubi98_ci.custom.yaml`、`wubi98_U.custom.yaml` 的 `style/font_face`
     键名原来多写了冒号（`"style/font_face:"`），已改正；
     `wubi98_ci.custom.yaml` 声明 `schema/dependencies: [py, wb_spelling]`。
+  - `wubi98_ci.schema.yaml` 的 `key_binder` 删掉
+    `{accept: KP_Decimal, send: period, when: composing}`：德沃夏克映射会把
+    重发的 `period` 再转换成 `e`（见“做法”）。
   - `lua/switcher.lua` 修了三处：数字键超出候选数时取到 nil 报错；
     `key.ctrl()` 改为 `key:ctrl()`；设了 `menu/alternative_select_keys` 时
     选择下标差 1。

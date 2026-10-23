@@ -14,7 +14,7 @@ set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 rime=$(cd "$here/../Rime" && pwd)
 lua="$rime/lua/dvorak_remap.lua"
-mount='"engine/processors/@before 0": "lua_processor@\*dvorak_remap"'
+mount='"engine/processors/@after 0": "lua_processor@\*dvorak_remap"'
 
 generated=$(awk '/^-- BEGIN GENERATED/{p=1;next} /^-- END GENERATED/{p=0} p' "$lua")
 if [ "$generated" != "$("$here/bin/gen_dvorak_map" --lua)" ]; then
