@@ -1,6 +1,3 @@
-# 别人的安装包目录，不纳入本仓库
-/MacOS_wubi98/
-
 # Rime/ 下的部署产物、同步目录、运行时状态和用户词典
 /Rime/build/
 /Rime/sync/
@@ -25,6 +22,3 @@ build/
 
 # 测试运行日志
 /rime-test/logs/
-
-# 下载的安装包（鼠须管官方 pkg）
-/installer/
