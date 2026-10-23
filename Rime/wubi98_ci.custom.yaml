@@ -1,0 +1,14 @@
+patch:
+  keyboard_layout: default
+  "style/font_face:": "98WB-0"
+  "style/text_orientation": horizontal
+  "style/fullscreen": false
+  "style/inline_preedit": false
+  "style/preedit_type": composition
+  "style/horizontal": false
+  "style/candidate_list_layout": stacked
+  "style/font_point": 18
+  "style/comment_font_face": "98WB-0"
+  "style/comment_font_point": 16
+  # 德沃夏克 -> QWERTY 按物理位置重映射，挂在 ascii_composer 之后
+  "engine/processors/@after 0": "lua_processor@*dvorak_remap"

@@ -1,0 +1,11 @@
+patch:
+  "style/font_face": "98WB-0"
+  "style/text_orientation": horizontal
+  "style/fullscreen": false
+  "style/inline_preedit": true
+  "style/preedit_type": composition
+  "style/horizontal": true
+  "style/candidate_list_layout": linear
+  "style/font_point": 18
+  "style/comment_font_face": "98WB-0"
+  "style/comment_font_point": 16

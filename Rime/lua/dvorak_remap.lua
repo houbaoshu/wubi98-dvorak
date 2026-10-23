@@ -5,7 +5,7 @@
 --
 -- 挂载（wubi98_ci.custom.yaml）：
 --   "engine/processors/@after 0": "lua_processor@*dvorak_remap"
--- 源文件在 rime-test/dv/lua/，由 rime-test/tools/make_user_dv.sh 复制到 user-dv。
+-- 测试见 rime-test/tools/check_dv.sh（由 make_users.sh 从 Rime/ 生成测试目录）。
 --
 -- 只转换无修饰键和只带 Shift 的键；带 Ctrl/Alt/Super/Lock 等其他修饰、
 -- 以及按键松开事件，原样放行。
