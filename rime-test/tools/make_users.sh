@@ -7,10 +7,8 @@
 #      与系统布局实测一致；
 #   2. 复制 Rime/（不含部署产物、运行时状态和用户词典 wubi98_ci.txt，
 #      让结果不依赖本机输入历史）；
-#   3. 在 default.custom.yaml 的 schema_list 末尾补上 wb_spelling：
-#      副本里没有现成的 build/，不列出就不会编译，拼音反查会出错；
-#   4. user-base 删掉挂载行；
-#   5. 部署。
+#   3. user-base 删掉挂载行；
+#   4. 部署。
 # 需要先运行 tools/build.sh。
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -40,15 +38,6 @@ for name in base dv; do
     --exclude='*.userdb/' --exclude=/user.yaml --exclude=/installation.yaml \
     --exclude=/wubi98_ci.txt --exclude=.DS_Store \
     "$rime/" "$dst/"
-
-  # schema_list 必须是文件的最后一段，追加的行才会落在它下面。
-  custom="$dst/default.custom.yaml"
-  if ! tail -n 1 "$custom" | grep -q '^    - {schema: [a-z0-9_]*}' ||
-     [ -n "$(tail -c 1 "$custom")" ]; then
-    echo "error: $custom 的最后一行不是 schema_list 的条目" >&2
-    exit 1
-  fi
-  printf '    - {schema: wb_spelling}\r\n' >> "$custom"
 
   if [ "$name" = base ]; then
     grep -v "^  $mount\$" "$rime/wubi98_ci.custom.yaml" \

@@ -125,8 +125,8 @@ check_dv.sh 先调用 make_users.sh，每次都从 `Rime/` 重新生成两个测
 - `user-dv`：`Rime/` 原样；
 - `user-base`：`Rime/` 去掉 dvorak_remap 的挂载行，作为基线。
 
-两者都不带用户词典，并在 `default.custom.yaml` 的 `schema_list` 末尾补上
-`wb_spelling`（副本没有现成的 `build/`，不列出就不会编译，拼音反查会出错）。
+两者都不带用户词典。拼音反查要用的 `wb_spelling` 由 `wubi98_ci.custom.yaml`
+声明为方案依赖，部署时一并编译，不需要另外处理。
 make_users.sh 还会核对 lua 里的映射表和 `dvorak_map.tsv` 与系统布局实测一致。
 
 每个用例 `cases/<名字>.keys` 按 QWERTY 键名写：基线一侧直接喂入；
