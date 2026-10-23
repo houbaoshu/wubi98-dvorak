@@ -32,8 +32,9 @@ local kNoop = 2
 
 local kShiftMask = 0x1
 
--- 以下映射表由 rime-test/tools/gen_dvorak_map --lua 生成（系统布局
--- com.apple.keylayout.Dvorak 与 com.apple.keylayout.US 实测），请勿手改。
+-- 以下映射表由 rime-test/bin/gen_dvorak_map --lua 生成（源码
+-- rime-test/tools/gen_dvorak_map.c；系统布局 com.apple.keylayout.Dvorak 与
+-- com.apple.keylayout.US 实测），请勿手改。
 -- 键：德沃夏克字符的 keycode；值：同一物理键、同一 Shift 层的 QWERTY 字符。
 -- BEGIN GENERATED
 local DVORAK_TO_QWERTY = {

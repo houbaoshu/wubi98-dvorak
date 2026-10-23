@@ -1,2 +1,1 @@
--std=c++17
 -I../vendor/dist/include

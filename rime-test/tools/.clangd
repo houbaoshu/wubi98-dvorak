@@ -1,0 +1,6 @@
+# clangd 配置。compile_flags.txt 对目录里所有文件生效，C 和 C++ 共用的参数
+# 放那里；-std=c++17 只给 .cc（与 build.sh 一致），不能加给 gen_dvorak_map.c。
+If:
+  PathMatch: .*\.cc
+CompileFlags:
+  Add: [-std=c++17]
