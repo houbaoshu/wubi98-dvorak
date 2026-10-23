@@ -9,6 +9,11 @@
 --
 -- 只转换无修饰键和只带 Shift 的键；带 Ctrl/Alt/Super/Lock 等其他修饰、
 -- 以及按键松开事件，原样放行。
+--
+-- 拼音反查（z 前缀，affix_segmentor@rvlk1）里按德沃夏克字母拼拼音：
+-- 字母原样放行；; ' , . 及其 Shift 层（换算结果是 QWERTY 字母）也原样放行，
+-- 分别是选第二、第三候选和标点；其余符号照旧按物理位置转换（翻页等）。
+-- 进入反查的 z 本身是在编码区为空时按物理 Z 键转换出来的，不受影响。
 
 local kRejected = 0
 local kAccepted = 1
@@ -90,6 +95,21 @@ local DVORAK_TO_QWERTY = {
 }
 -- END GENERATED
 
+local function is_letter(keycode)
+  return (keycode >= 0x41 and keycode <= 0x5a) or
+         (keycode >= 0x61 and keycode <= 0x7a)
+end
+
+-- 编码区最后一段是拼音反查段：刚按 z 时带 rvlk1_prefix，拼音字母段带 rvlk1。
+local function in_reverse_lookup(context)
+  local composition = context.composition
+  if composition:empty() then
+    return false
+  end
+  local seg = composition:back()
+  return seg:has_tag("rvlk1") or seg:has_tag("rvlk1_prefix")
+end
+
 local function init(env)
   env.redispatching = false
 end
@@ -104,6 +124,10 @@ local function func(key, env)
   end
   local qwerty = DVORAK_TO_QWERTY[key.keycode]
   if not qwerty then
+    return kNoop
+  end
+  if (is_letter(key.keycode) or is_letter(qwerty)) and
+     in_reverse_lookup(env.engine.context) then
     return kNoop
   end
   env.redispatching = true
