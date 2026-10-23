@@ -2,16 +2,23 @@
 //
 // 用法:
 //   rime_dvtest --shared DIR --user DIR [--schema ID] [--deploy-only]
-//               [-f KEYFILE] [KEY ...]
+//               [--dvorak [--dvorak-map TSV]] [-f KEYFILE] [KEY ...]
 //
 // KEY 的写法与 Rime 的键名一致，修饰键用 + 连接，例如:
 //   a  2  comma  space  Return  Shift+Shift_L  Release+Shift_L  Control+grave
 // 键名由 RimeGetKeycodeByName 解析，修饰键名由 RimeGetModifierByName 解析。
 // KEYFILE 中按空白分隔，# 之后到行尾为注释。
 //
+// --dvorak：用例仍按物理 QWERTY 键写，喂给 librime 前先换成同一物理键在
+// 德沃夏克布局下的字符（模拟系统布局为德沃夏克时 Squirrel 收到的字符）。
+// 映射表默认读 <可执行文件目录>/../tools/dvorak_map.tsv。为了能和 QWERTY
+// 运行的 stdout 直接 diff，stdout 仍打印物理键名和 QWERTY keycode，
+// 实际喂入的 keycode 打到 stderr。
+//
 // 部署由本程序调用 start_maintenance(True) 完成；日志 (glog) 只写到 stderr，
 // 逐键结果写到 stdout。
 
+#include <mach-o/dyld.h>
 #include <rime_api.h>
 
 #include <climits>
@@ -19,6 +26,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -41,7 +49,43 @@ struct KeySpec {
 void Usage() {
   fprintf(stderr,
           "usage: rime_dvtest --shared DIR --user DIR [--schema ID] "
-          "[--deploy-only] [-f KEYFILE] [KEY ...]\n");
+          "[--deploy-only] [--dvorak [--dvorak-map TSV]] [-f KEYFILE] "
+          "[KEY ...]\n");
+}
+
+std::string DefaultDvorakMapPath() {
+  char buf[PATH_MAX];
+  uint32_t size = sizeof(buf);
+  char resolved[PATH_MAX];
+  if (_NSGetExecutablePath(buf, &size) != 0 || !realpath(buf, resolved))
+    return "";
+  std::string exe = resolved;
+  return exe.substr(0, exe.rfind('/')) + "/../tools/dvorak_map.tsv";
+}
+
+// 读 gen_dvorak_map --tsv 的输出，建立 QWERTY 字符 -> 德沃夏克字符
+// （同一物理键、同一 Shift 层）的映射。
+bool LoadDvorakMap(const std::string& file, std::map<int, int>* qwerty_to_dv) {
+  std::ifstream in(file);
+  if (!in) {
+    fprintf(stderr, "error: cannot open dvorak map: %s\n", file.c_str());
+    return false;
+  }
+  std::string line;
+  while (std::getline(in, line)) {
+    if (line.empty() || line[0] == '#')
+      continue;
+    std::istringstream cols(line);
+    std::string vk, q, qs, d, ds;
+    if (!(cols >> vk >> q >> qs >> d >> ds) || q.size() != 1 ||
+        qs.size() != 1 || d.size() != 1 || ds.size() != 1) {
+      fprintf(stderr, "error: bad line in dvorak map: %s\n", line.c_str());
+      return false;
+    }
+    (*qwerty_to_dv)[(unsigned char)q[0]] = (unsigned char)d[0];
+    (*qwerty_to_dv)[(unsigned char)qs[0]] = (unsigned char)ds[0];
+  }
+  return !qwerty_to_dv->empty();
 }
 
 std::string AbsolutePath(const std::string& p) {
@@ -104,8 +148,12 @@ bool ReadKeyFile(const std::string& file, std::vector<std::string>* keys) {
   return true;
 }
 
+bool g_deploy_failed = false;
+
 void OnNotification(void*, RimeSessionId, const char* type, const char* value) {
   fprintf(stderr, "[notification] %s: %s\n", type, value);
+  if (!strcmp(type, "deploy") && !strcmp(value, "failure"))
+    g_deploy_failed = true;
 }
 
 // 在 preedit 的光标处插入 ‸，便于看清光标位置。
@@ -172,6 +220,8 @@ void PrintState(RimeApi* rime, RimeSessionId session) {
 int main(int argc, char* argv[]) {
   std::string shared_dir, user_dir, schema, key_file;
   bool deploy_only = false;
+  bool dvorak = false;
+  std::string dvorak_map_file;
   std::vector<std::string> key_texts;
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
@@ -192,6 +242,10 @@ int main(int argc, char* argv[]) {
       key_file = next("-f");
     else if (a == "--deploy-only")
       deploy_only = true;
+    else if (a == "--dvorak")
+      dvorak = true;
+    else if (a == "--dvorak-map")
+      dvorak_map_file = next("--dvorak-map");
     else if (a == "-h" || a == "--help") {
       Usage();
       return 0;
@@ -206,6 +260,15 @@ int main(int argc, char* argv[]) {
   user_dir = AbsolutePath(user_dir);
   if (!key_file.empty() && !ReadKeyFile(key_file, &key_texts))
     return 2;
+  std::map<int, int> qwerty_to_dv;
+  if (dvorak) {
+    if (dvorak_map_file.empty())
+      dvorak_map_file = DefaultDvorakMapPath();
+    if (!LoadDvorakMap(dvorak_map_file, &qwerty_to_dv))
+      return 2;
+    fprintf(stderr, "[dvtest] dvorak map: %s (%zu chars)\n",
+            dvorak_map_file.c_str(), qwerty_to_dv.size());
+  }
 
   std::vector<KeySpec> keys;
   for (const auto& t : key_texts) {
@@ -236,6 +299,11 @@ int main(int argc, char* argv[]) {
     rime->join_maintenance_thread();
   }
   fprintf(stderr, "[dvtest] maintenance finished\n");
+  if (g_deploy_failed) {
+    fprintf(stderr, "error: deployment failed\n");
+    rime->finalize();
+    return 1;
+  }
 
   if (deploy_only) {
     rime->finalize();
@@ -259,7 +327,15 @@ int main(int argc, char* argv[]) {
   PrintState(rime, session);
   for (size_t i = 0; i < keys.size(); ++i) {
     const KeySpec& k = keys[i];
-    Bool handled = rime->process_key(session, k.keycode, k.mask);
+    int keycode = k.keycode;
+    if (dvorak) {
+      auto it = qwerty_to_dv.find(k.keycode);
+      if (it != qwerty_to_dv.end())
+        keycode = it->second;
+      fprintf(stderr, "[dvtest] key %zu: %s 0x%x -> 0x%x\n", i + 1,
+              k.text.c_str(), k.keycode, keycode);
+    }
+    Bool handled = rime->process_key(session, keycode, k.mask);
     printf("== [%zu] %s (keycode=0x%x mask=0x%x) 处理=%s\n", i + 1,
            k.text.c_str(), k.keycode, k.mask, handled ? "是" : "否");
     PrintState(rime, session);
