@@ -1,0 +1,15 @@
+# 符号输入（/ 加字母）里的选字、翻页，以及退出后恢复按物理位置转换。
+# 代码由 symbols.yaml 中挑出：/fs 分数（⅟ ½ ↉ …），/sz 骰子（⚀ ⚁ …），
+# /O 大写（Ō Ó …），每个代码都含布局不同的字母。四码编码 aaab 同用例 01。
+# 本文件是 QWERTY 一侧，写 librime 应当收到的字符；德沃夏克一侧见 .dv.keys
+slash f s
+semicolon            # 选第二候选
+slash s z
+1                    # 选第一候选
+slash f s
+equal                # 向后翻页
+minus                # 向前翻页
+apostrophe           # 选第三候选
+slash Shift+O
+1
+a a a b

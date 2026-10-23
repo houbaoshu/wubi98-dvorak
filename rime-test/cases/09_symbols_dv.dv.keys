@@ -1,0 +1,20 @@
+# 德沃夏克一侧，按物理键写：
+#   物理 / -> z（编码区为空，转换成 / 进入符号输入）
+#   物理 y ; -> 德沃夏克 f s，符号输入里原样
+#   物理 z -> ;：换算结果是字母 z，符号输入里原样，选第二候选
+#   物理 ; / -> 德沃夏克 s z，原样
+#   物理 = -> ]，物理 - -> [：不是字母，照旧转换成 = 和 -，翻页
+#   物理 q -> '：同理原样，选第三候选
+#   物理 Shift+S -> 德沃夏克 O，原样
+#   物理 a a a b：已退出符号输入，转换回 a a a b
+slash y semicolon
+z
+slash semicolon slash
+1
+slash y semicolon
+equal
+minus
+q
+slash Shift+S
+1
+a a a b

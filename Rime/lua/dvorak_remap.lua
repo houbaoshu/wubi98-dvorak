@@ -14,6 +14,10 @@
 -- 字母原样放行；; ' , . 及其 Shift 层（换算结果是 QWERTY 字母）也原样放行，
 -- 分别是选第二、第三候选和标点；其余符号照旧按物理位置转换（翻页等）。
 -- 进入反查的 z 本身是在编码区为空时按物理 Z 键转换出来的，不受影响。
+--
+-- 符号输入（/ 加字母，如 /fs 出分数，代码是拼音缩写）同样按德沃夏克字母敲，
+-- 哪些键放行与反查相同。进入符号输入的 / 是在编码区为空时按物理 / 键
+-- 转换出来的，不受影响；敲了数字或其他符号之后，后面的字母照旧转换。
 
 local kRejected = 0
 local kAccepted = 1
@@ -110,6 +114,20 @@ local function in_reverse_lookup(context)
   return seg:has_tag("rvlk1") or seg:has_tag("rvlk1_prefix")
 end
 
+-- 编码区是符号输入：最后一段带 punct 标签，且整个编码是 / 加零个以上字母。
+-- 只看标签不够：aa/、/1、/fs/ 的最后一段也带 punct，但再按字母进的是五笔。
+-- 这条规则是照 wubi98_ci.schema.yaml 的 recognizer/patterns/punct
+-- （^/([0-9]0?|[A-Za-z]+)$）手写的：只有这时下一个字母才会被收进符号代码。
+-- 改那条 pattern 时要同步改这里。
+local function in_symbols(context)
+  local composition = context.composition
+  if composition:empty() then
+    return false
+  end
+  return composition:back():has_tag("punct") and
+         context.input:match("^/[A-Za-z]*$") ~= nil
+end
+
 local function init(env)
   env.redispatching = false
 end
@@ -127,7 +145,8 @@ local function func(key, env)
     return kNoop
   end
   if (is_letter(key.keycode) or is_letter(qwerty)) and
-     in_reverse_lookup(env.engine.context) then
+     (in_reverse_lookup(env.engine.context) or
+      in_symbols(env.engine.context)) then
     return kNoop
   end
   env.redispatching = true
