@@ -91,7 +91,7 @@ rime-test/               隔离的 librime 测试环境
    cp -Rp ~/Library/Rime ~/Library/Rime.backup
    ```
 
-2. 已有 98 五笔配置时，只需要放入德沃夏克相关的三个文件。前提是现有配置已经
+2. 已有 98 五笔配置时，只需要放入德沃夏克相关的六个文件。前提是现有配置已经
    做过“来源说明”里适配鼠须管 1.1.2 的清理。没做过的（例如直接装的旧版
    98 五笔），先把冲突的文件挪到备份目录，有哪个挪哪个：
 
@@ -111,15 +111,20 @@ rime-test/               隔离的 librime 测试环境
    - 三个 yaml 是 rime-prelude 的旧副本，会挡住鼠须管自带的新版；
      测试和符号输入的代码以新版为准。
 
-   然后复制三个文件：
+   然后复制六个文件：
 
    ```sh
    cp Rime/lua/dvorak_remap.lua ~/Library/Rime/lua/
-   cp Rime/wubi98_ci.custom.yaml Rime/squirrel.custom.yaml ~/Library/Rime/
+   cp Rime/default.custom.yaml Rime/squirrel.custom.yaml \
+      Rime/wubi98_ci.custom.yaml Rime/wubi98_dz.custom.yaml \
+      Rime/wubi98_U.custom.yaml ~/Library/Rime/
    ```
 
-   如果你本地改过这两个 yaml，请手工合并：`wubi98_ci.custom.yaml` 的 `patch:`
-   下加上面那行挂载，`squirrel.custom.yaml` 的 `patch:` 下设
+   如果你本地改过这几个 yaml，请手工合并：`wubi98_ci.custom.yaml`、
+   `wubi98_dz.custom.yaml`、`wubi98_U.custom.yaml` 的 `patch:` 下加上面那行挂载
+   （以及依赖、`switches/@1`、`switches/@6`，照仓库里的文件），
+   `default.custom.yaml` 的 `patch:` 下把 `schema_list` 设为 wubi98_ci、
+   wubi98_dz、wubi98_U、py，`squirrel.custom.yaml` 的 `patch:` 下设
    `"keyboard_layout": com.apple.keylayout.Dvorak`。
 
    再删掉三个方案 `.schema.yaml` 里小键盘小数点的绑定：
@@ -133,7 +138,7 @@ rime-test/               隔离的 librime 测试环境
 3. 在鼠须管菜单里选“重新部署”。
 4. 系统设置里输入源保留鼠须管即可，打英文用鼠须管的英文模式。
 
-回滚：从备份里拷回两个 yaml，删掉 `~/Library/Rime/lua/dvorak_remap.lua`，再重新部署。
+回滚：从备份里拷回这几个 yaml，删掉 `~/Library/Rime/lua/dvorak_remap.lua`，再重新部署。
 第 2 步迁移挪走的文件不必挪回（挪回 `opencc/` 那几个会恢复崩溃）。
 
 ## 跑测试
