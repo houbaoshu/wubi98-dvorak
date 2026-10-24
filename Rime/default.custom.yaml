@@ -8,3 +8,4 @@ patch:
   schema_list:
     - {schema: wubi98_ci}
     - {schema: py}
+  "switcher/save_options/+": [single_char, zh_trad]
