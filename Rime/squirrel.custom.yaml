@@ -1,2 +1,7 @@
 patch:
   "keyboard_layout": com.apple.keylayout.Dvorak
+  # 终端和编辑器里新开会话默认英文。写到叶子上，才不会替掉默认配置里这些 App 的其他选项
+  # （如 Terminal 的 no_inline）。
+  "app_options/com.apple.Terminal/ascii_mode": true
+  "app_options/com.mitchellh.ghostty/ascii_mode": true
+  "app_options/dev.zed.Zed/ascii_mode": true
