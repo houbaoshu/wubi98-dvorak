@@ -9,7 +9,11 @@
 
 -- --=========================================================关键字修改--==========================================================
 -- --==========================================================--==========================================================
-rv_var={ week_var="week",date_var="date",nl_var="nl",time_var="time",jq_var="jq",switch_keyword="next",help="help",switch_schema="mode"}	-- 编码关键字修改
+-- 关键字按引擎实际收到的字母写。中文模式下德沃夏克字母会被 dvorak_remap 换成同一物理键的
+-- QWERTY 字母，所以这里是德沃夏克敲这个词时引擎收到的字母（用 rime-test/tools/dvorak_map.tsv 换算）。
+-- 行尾注释是对应的德沃夏克词；rv_show 是显示给人看的拼写（helper.lua 用），改了 rv_var 要同步改。
+rv_var={ week_var="hat",date_var="hakd",nl_var="pfla",time_var="kgmd",jq_var="kdom",switch_keyword="ldbk",help="jdpr",switch_schema="mshd"}	-- 编码关键字修改：day date luna time term next help mode
+rv_show={ week_var="day",date_var="date",nl_var="luna",time_var="time",jq_var="term",switch_keyword="next",help="help",switch_schema="mode"}
 trad_keyword="zh_trad"		-- 简繁切换switcher参数
 single_keyword="single_char"	-- 单字过滤switcher参数
 spelling_keyword="new_spelling"	-- 拆分switcher参数

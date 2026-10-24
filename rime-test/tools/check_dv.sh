@@ -6,6 +6,11 @@
 # mask 再比较，其余输出必须完全一致。
 # 若有同名的 <用例>.expect，其中每行（# 开头的除外）还必须作为整行出现在
 # 两侧的输出里，用来核对结果本身对不对（两侧一致但都错时也能发现）。
+# 若有同名的 <用例>.mask，其中是 sed -E 的脚本，比较两侧输出前先对两侧各过一遍
+# （只用于比较，日志和 .expect* 核对用的仍是原样输出）；两侧是前后脚跑的，
+# 日期、时间可能差一秒，需要把这类内容抹掉再比。
+# 若有同名的 <用例>.expect_re，其中每行（# 开头的除外）是扩展正则（grep -E），
+# 两侧的输出里都必须有一行匹配；用来核对日期、时间这类每次运行都不同的内容。
 # 若有同名的 <用例>.schema，其中的方案 id 作为 --schema 传给两侧的驱动
 # （默认方案是 schema_list 里的第一个，即 wubi98_ci）。
 # 结果写到 logs/<用例>.base.out|err 和 logs/<用例>.dv.out|err。
@@ -56,12 +61,15 @@ for keys in "$here"/cases/*.keys; do
   fi
   errors=$(cat "$here/logs/$n.base.err" "$here/logs/$n.dv.err" |
            grep -cE '^[EF][0-9]' || true)
+  mask="$here/cases/$n.mask"
+  # 比较用的输出：换键的用例去掉键名，有 .mask 的再抹掉易变内容
+  norm() {
+    if [ "$dv_keys" = "$keys" ]; then cat "$1"; else strip_keys "$1"; fi |
+      if [ -f "$mask" ]; then sed -E -f "$mask"; else cat; fi
+  }
   result="不一致"
-  if [ "$dv_keys" = "$keys" ]; then
-    cmp -s "$here/logs/$n.base.out" "$here/logs/$n.dv.out" && result="一致"
-  else
-    [ "$(strip_keys "$here/logs/$n.base.out")" = \
-      "$(strip_keys "$here/logs/$n.dv.out")" ] && result="一致（换键，不比键名）"
+  if [ "$(norm "$here/logs/$n.base.out")" = "$(norm "$here/logs/$n.dv.out")" ]; then
+    if [ "$dv_keys" = "$keys" ]; then result="一致"; else result="一致（换键，不比键名）"; fi
   fi
   if [ "$result" = "不一致" ]; then
     failed=1
@@ -82,6 +90,24 @@ for keys in "$here"/cases/*.keys; do
       failed=1
     else
       result="${result}，符合 $n.expect"
+    fi
+  fi
+  expect_re="$here/cases/$n.expect_re"
+  if [ -f "$expect_re" ]; then
+    missing=$(grep -v '^#' "$expect_re" | while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      for out in "$here/logs/$n.base.out" "$here/logs/$n.dv.out"; do
+        if ! grep -qE -- "$line" "$out"; then
+          echo "$line"
+          break
+        fi
+      done
+    done)
+    if [ -n "$missing" ]; then
+      result="${result}，不符合 $n.expect_re，缺少：$(echo "$missing" | sed 's/^ *//' | paste -sd ' ' -)"
+      failed=1
+    else
+      result="${result}，符合 $n.expect_re"
     fi
   fi
   if [ "$errors" != 0 ]; then
