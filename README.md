@@ -23,7 +23,7 @@
   - 只转换无修饰键和只带 Shift 的键；带 Ctrl/Alt/Command 等修饰的键、
     按键松开事件原样放行。
   - 下游绑定若把放行的键换成映射表里的字符再重发，重发的键会被再转换一次。
-    所以删掉了 `wubi98_ci.schema.yaml` 里小键盘 `KP_Decimal` 发 `period`
+    所以删掉了 `wubi98_ci`、`wubi98_dz`、`wubi98_U` 三个 `.schema.yaml` 里小键盘 `KP_Decimal` 发 `period`
     的绑定（否则编码中按小键盘小数点会变成编码 `e`）；编码中按小键盘小数点
     现在交给应用。
   - 拼音反查（`z` 前缀）里按德沃夏克字母拼拼音：字母原样放行；
@@ -47,9 +47,7 @@
   "engine/processors/@after 0": "lua_processor@*dvorak_remap"
 ```
 
-另外去掉了小键盘小数点的绑定，见上：`wubi98_ci` 是直接删了 schema 里的一行；
-`wubi98_dz`、`wubi98_U` 不改原文件，在各自 custom.yaml 里用 patch 整表替换
-`key_binder/bindings`（patch 不能删列表项）。三个方案都同样声明了
+另外三个方案的 `.schema.yaml` 里各删了小键盘小数点的一行绑定，见上。三个方案都同样声明了
 `schema/dependencies: [py, wb_spelling]`，并去掉 `zh_trad`、`single_char` 的
 `reset: 0`（`switches/@1`、`switches/@6`，三个方案下标相同），
 `default.custom.yaml` 的方案列表是 wubi98_ci、wubi98_dz、wubi98_U、py。
@@ -124,11 +122,12 @@ rime-test/               隔离的 librime 测试环境
    下加上面那行挂载，`squirrel.custom.yaml` 的 `patch:` 下设
    `"keyboard_layout": com.apple.keylayout.Dvorak`。
 
-   再删掉 `wubi98_ci.schema.yaml` 里小键盘小数点的绑定：
+   再删掉三个方案 `.schema.yaml` 里小键盘小数点的绑定：
 
    ```sh
    sed -i '' '/{accept: KP_Decimal, send: period, when: composing}/d' \
-     ~/Library/Rime/wubi98_ci.schema.yaml
+     ~/Library/Rime/wubi98_ci.schema.yaml \
+     ~/Library/Rime/wubi98_dz.schema.yaml ~/Library/Rime/wubi98_U.schema.yaml
    ```
 
 3. 在鼠须管菜单里选“重新部署”。
@@ -231,7 +230,7 @@ rime-test/tools/run_case.sh rime-test/user-dv /dev/null --dvorak a a a b
   - `wubi98_ci.custom.yaml`、`wubi98_U.custom.yaml` 的 `style/font_face`
     键名原来多写了冒号（`"style/font_face:"`），已改正；
     `wubi98_ci.custom.yaml` 声明 `schema/dependencies: [py, wb_spelling]`。
-  - `wubi98_ci.schema.yaml` 的 `key_binder` 删掉
+  - `wubi98_ci`、`wubi98_dz`、`wubi98_U` 三个 `.schema.yaml` 的 `key_binder` 删掉
     `{accept: KP_Decimal, send: period, when: composing}`：德沃夏克映射会把
     重发的 `period` 再转换成 `e`（见“做法”）。
   - `lua/switcher.lua` 修了三处：数字键超出候选数时取到 nil 报错；
