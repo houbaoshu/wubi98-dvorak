@@ -6,6 +6,8 @@
 # mask 再比较，其余输出必须完全一致。
 # 若有同名的 <用例>.expect，其中每行（# 开头的除外）还必须作为整行出现在
 # 两侧的输出里，用来核对结果本身对不对（两侧一致但都错时也能发现）。
+# 若有同名的 <用例>.schema，其中的方案 id 作为 --schema 传给两侧的驱动
+# （默认方案是 schema_list 里的第一个，即 wubi98_ci）。
 # 结果写到 logs/<用例>.base.out|err 和 logs/<用例>.dv.out|err。
 # 先用 build.sh 重新编译驱动和生成器（改过 tools/ 下的源码也不会测到旧程序），
 # 再用 make_users.sh 从 ../Rime 重新生成两个用户目录，测的总是 Rime/ 当前的配置；
@@ -34,13 +36,17 @@ for keys in "$here"/cases/*.keys; do
   n=$(basename "$keys" .keys)
   dv_keys="$here/cases/$n.dv.keys"
   [ -f "$dv_keys" ] || dv_keys=$keys
+  schema_args=""
+  if [ -f "$here/cases/$n.schema" ]; then
+    schema_args="--schema $(tr -d ' \n' < "$here/cases/$n.schema")"
+  fi
   # 两侧都跑，各自记退出码，日志都是这一轮的。某一侧运行出错（如键名写错）
   # 时报出用例名和出错的一侧，继续跑其余用例。
   bad=""
-  "$here/tools/run_case.sh" "$base" "$keys" \
+  "$here/tools/run_case.sh" "$base" "$keys" $schema_args \
     > "$here/logs/$n.base.out" 2> "$here/logs/$n.base.err" ||
     bad="$bad logs/$n.base.err"
-  "$here/tools/run_case.sh" "$dv" "$dv_keys" --dvorak \
+  "$here/tools/run_case.sh" "$dv" "$dv_keys" --dvorak $schema_args \
     > "$here/logs/$n.dv.out" 2> "$here/logs/$n.dv.err" ||
     bad="$bad logs/$n.dv.err"
   if [ -n "$bad" ]; then

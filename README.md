@@ -41,13 +41,18 @@
   调用系统 `UCKeyTranslate`，
   对 `com.apple.keylayout.US` 和 `com.apple.keylayout.Dvorak` 实测生成，不是手写的。
 
-挂载只改了 `wubi98_ci` 方案（`wubi98_ci.custom.yaml` 里的一行）：
+挂载只改了 `wubi98_ci`、`wubi98_dz`、`wubi98_U` 三个方案（各自 custom.yaml 里的一行）：
 
 ```yaml
   "engine/processors/@after 0": "lua_processor@*dvorak_remap"
 ```
 
-另外在 `wubi98_ci.schema.yaml` 里删了一行绑定，见上。
+另外去掉了小键盘小数点的绑定，见上：`wubi98_ci` 是直接删了 schema 里的一行；
+`wubi98_dz`、`wubi98_U` 不改原文件，在各自 custom.yaml 里用 patch 整表替换
+`key_binder/bindings`（patch 不能删列表项）。三个方案都同样声明了
+`schema/dependencies: [py, wb_spelling]`，并去掉 `zh_trad`、`single_char` 的
+`reset: 0`（`switches/@1`、`switches/@6`，三个方案下标相同），
+`default.custom.yaml` 的方案列表是 wubi98_ci、wubi98_dz、wubi98_U、py。
 
 ## 目录结构
 
