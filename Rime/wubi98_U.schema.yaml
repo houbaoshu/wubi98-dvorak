@@ -257,7 +257,6 @@ key_binder:
     - {accept: KP_7, send: 7, when: composing}
     - {accept: KP_8, send: 8, when: composing}
     - {accept: KP_9, send: 9, when: composing}
-    - {accept: KP_Decimal, send: period, when: composing}
 punctuator:
   import_preset: symbols
   

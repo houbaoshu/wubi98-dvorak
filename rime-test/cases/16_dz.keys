@@ -1,0 +1,13 @@
+# wubi98_dz 方案（--schema 见 16_dz.schema）：打字、z 拼音反查、/ 符号输入各一段，
+# 跟 wubi98_ci 的用例 01、05、09 同一组按键。
+# 四码字 aaab（㐂）在 wubi98_dz 词典中只对应这一个字；拼音 bai、符号代码 fs、sz
+# 同用例 05、09。本文件是 QWERTY 一侧，写 librime 应当收到的字符；
+# 德沃夏克一侧见 16_dz.dv.keys
+a a a b
+z b a i
+space
+slash f s
+semicolon            # 选第二候选
+slash s z
+1                    # 选第一候选
+a a a b

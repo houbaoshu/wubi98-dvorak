@@ -7,7 +7,7 @@
 #      与系统布局实测一致；
 #   2. 复制 Rime/（不含部署产物、运行时状态和用户词典 wubi98_ci.txt，
 #      让结果不依赖本机输入历史）；
-#   3. user-base 删掉挂载行；
+#   3. user-base 从 wubi98_ci、wubi98_dz、wubi98_U 三个方案的 custom 里删掉挂载行；
 #   4. 部署。
 # 需要先运行 tools/build.sh。
 set -eu
@@ -25,10 +25,13 @@ if ! "$here/bin/gen_dvorak_map" --tsv | cmp -s - "$here/tools/dvorak_map.tsv"; t
   echo "error: tools/dvorak_map.tsv 与 gen_dvorak_map --tsv 的输出不一致" >&2
   exit 1
 fi
-if [ "$(grep -c "^  $mount\$" "$rime/wubi98_ci.custom.yaml")" != 1 ]; then
-  echo "error: Rime/wubi98_ci.custom.yaml 里没有恰好一行 dvorak_remap 挂载" >&2
-  exit 1
-fi
+schemas="wubi98_ci wubi98_dz wubi98_U"
+for s in $schemas; do
+  if [ "$(grep -c "^  $mount\$" "$rime/$s.custom.yaml")" != 1 ]; then
+    echo "error: Rime/$s.custom.yaml 里没有恰好一行 dvorak_remap 挂载" >&2
+    exit 1
+  fi
+done
 
 mkdir -p "$here/logs"
 for name in base dv; do
@@ -40,8 +43,9 @@ for name in base dv; do
     "$rime/" "$dst/"
 
   if [ "$name" = base ]; then
-    grep -v "^  $mount\$" "$rime/wubi98_ci.custom.yaml" \
-      > "$dst/wubi98_ci.custom.yaml"
+    for s in $schemas; do
+      grep -v "^  $mount\$" "$rime/$s.custom.yaml" > "$dst/$s.custom.yaml"
+    done
   fi
 
   if ! "$here/bin/rime_dvtest" --shared "$here/shared" --user "$dst" \

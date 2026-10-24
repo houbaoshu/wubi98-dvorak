@@ -23,7 +23,7 @@
   - 只转换无修饰键和只带 Shift 的键；带 Ctrl/Alt/Command 等修饰的键、
     按键松开事件原样放行。
   - 下游绑定若把放行的键换成映射表里的字符再重发，重发的键会被再转换一次。
-    所以删掉了 `wubi98_ci.schema.yaml` 里小键盘 `KP_Decimal` 发 `period`
+    所以删掉了 `wubi98_ci`、`wubi98_dz`、`wubi98_U` 三个 `.schema.yaml` 里小键盘 `KP_Decimal` 发 `period`
     的绑定（否则编码中按小键盘小数点会变成编码 `e`）；编码中按小键盘小数点
     现在交给应用。
   - 拼音反查（`z` 前缀）里按德沃夏克字母拼拼音：字母原样放行；
@@ -41,13 +41,16 @@
   调用系统 `UCKeyTranslate`，
   对 `com.apple.keylayout.US` 和 `com.apple.keylayout.Dvorak` 实测生成，不是手写的。
 
-挂载只改了 `wubi98_ci` 方案（`wubi98_ci.custom.yaml` 里的一行）：
+挂载只改了 `wubi98_ci`、`wubi98_dz`、`wubi98_U` 三个方案（各自 custom.yaml 里的一行）：
 
 ```yaml
   "engine/processors/@after 0": "lua_processor@*dvorak_remap"
 ```
 
-另外在 `wubi98_ci.schema.yaml` 里删了一行绑定，见上。
+另外三个方案的 `.schema.yaml` 里各删了小键盘小数点的一行绑定，见上。三个方案都同样声明了
+`schema/dependencies: [py, wb_spelling]`，并去掉 `zh_trad`、`single_char` 的
+`reset: 0`（`switches/@1`、`switches/@6`，三个方案下标相同），
+`default.custom.yaml` 的方案列表是 wubi98_ci、wubi98_dz、wubi98_U、py。
 
 ## 目录结构
 
@@ -88,7 +91,7 @@ rime-test/               隔离的 librime 测试环境
    cp -Rp ~/Library/Rime ~/Library/Rime.backup
    ```
 
-2. 已有 98 五笔配置时，只需要放入德沃夏克相关的三个文件。前提是现有配置已经
+2. 已有 98 五笔配置时，只需要放入德沃夏克相关的六个文件。前提是现有配置已经
    做过“来源说明”里适配鼠须管 1.1.2 的清理。没做过的（例如直接装的旧版
    98 五笔），先把冲突的文件挪到备份目录，有哪个挪哪个：
 
@@ -108,28 +111,34 @@ rime-test/               隔离的 librime 测试环境
    - 三个 yaml 是 rime-prelude 的旧副本，会挡住鼠须管自带的新版；
      测试和符号输入的代码以新版为准。
 
-   然后复制三个文件：
+   然后复制六个文件：
 
    ```sh
    cp Rime/lua/dvorak_remap.lua ~/Library/Rime/lua/
-   cp Rime/wubi98_ci.custom.yaml Rime/squirrel.custom.yaml ~/Library/Rime/
+   cp Rime/default.custom.yaml Rime/squirrel.custom.yaml \
+      Rime/wubi98_ci.custom.yaml Rime/wubi98_dz.custom.yaml \
+      Rime/wubi98_U.custom.yaml ~/Library/Rime/
    ```
 
-   如果你本地改过这两个 yaml，请手工合并：`wubi98_ci.custom.yaml` 的 `patch:`
-   下加上面那行挂载，`squirrel.custom.yaml` 的 `patch:` 下设
+   如果你本地改过这几个 yaml，请手工合并：`wubi98_ci.custom.yaml`、
+   `wubi98_dz.custom.yaml`、`wubi98_U.custom.yaml` 的 `patch:` 下加上面那行挂载
+   （以及依赖、`switches/@1`、`switches/@6`，照仓库里的文件），
+   `default.custom.yaml` 的 `patch:` 下把 `schema_list` 设为 wubi98_ci、
+   wubi98_dz、wubi98_U、py，`squirrel.custom.yaml` 的 `patch:` 下设
    `"keyboard_layout": com.apple.keylayout.Dvorak`。
 
-   再删掉 `wubi98_ci.schema.yaml` 里小键盘小数点的绑定：
+   再删掉三个方案 `.schema.yaml` 里小键盘小数点的绑定：
 
    ```sh
    sed -i '' '/{accept: KP_Decimal, send: period, when: composing}/d' \
-     ~/Library/Rime/wubi98_ci.schema.yaml
+     ~/Library/Rime/wubi98_ci.schema.yaml \
+     ~/Library/Rime/wubi98_dz.schema.yaml ~/Library/Rime/wubi98_U.schema.yaml
    ```
 
 3. 在鼠须管菜单里选“重新部署”。
 4. 系统设置里输入源保留鼠须管即可，打英文用鼠须管的英文模式。
 
-回滚：从备份里拷回两个 yaml，删掉 `~/Library/Rime/lua/dvorak_remap.lua`，再重新部署。
+回滚：从备份里拷回这几个 yaml，删掉 `~/Library/Rime/lua/dvorak_remap.lua`，再重新部署。
 第 2 步迁移挪走的文件不必挪回（挪回 `opencc/` 那几个会恢复崩溃）。
 
 ## 跑测试
@@ -226,7 +235,7 @@ rime-test/tools/run_case.sh rime-test/user-dv /dev/null --dvorak a a a b
   - `wubi98_ci.custom.yaml`、`wubi98_U.custom.yaml` 的 `style/font_face`
     键名原来多写了冒号（`"style/font_face:"`），已改正；
     `wubi98_ci.custom.yaml` 声明 `schema/dependencies: [py, wb_spelling]`。
-  - `wubi98_ci.schema.yaml` 的 `key_binder` 删掉
+  - `wubi98_ci`、`wubi98_dz`、`wubi98_U` 三个 `.schema.yaml` 的 `key_binder` 删掉
     `{accept: KP_Decimal, send: period, when: composing}`：德沃夏克映射会把
     重发的 `period` 再转换成 `e`（见“做法”）。
   - `lua/switcher.lua` 修了三处：数字键超出候选数时取到 nil 报错；

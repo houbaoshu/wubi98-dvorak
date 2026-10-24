@@ -7,5 +7,7 @@ customization:
 patch:
   schema_list:
     - {schema: wubi98_ci}
+    - {schema: wubi98_dz}
+    - {schema: wubi98_U}
     - {schema: py}
   "switcher/save_options/+": [single_char, zh_trad]

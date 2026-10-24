@@ -1,0 +1,13 @@
+# 德沃夏克一侧，按物理键写，换算见用例 05、09 的 .dv.keys：
+#   物理 z n a g -> 德沃夏克 ; b a i，z 转回 z 进入反查，拼音字母原样
+#   物理 / y ; -> z f s，/ 进入符号输入，fs 原样；物理 z（; 层）选第二候选
+#   物理 / ; / -> z s z，/sz 原样，选第一候选
+#   物理 a a a b：已退出符号输入，转换回 a a a b
+a a a b
+z n a g
+space
+slash y semicolon
+z
+slash semicolon slash
+1
+a a a b

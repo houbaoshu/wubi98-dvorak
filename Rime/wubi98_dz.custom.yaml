@@ -7,3 +7,16 @@ patch:
   "style/font_point": 18
   "style/comment_font_face": "98WB-0"
   "style/comment_font_point": 16
+  # 拼音反查用 py，三重注解用 wb_spelling；列为依赖后部署时会一并编译，
+  # 不必出现在方案选单里。
+  "schema/dependencies": [py, wb_spelling]
+  # 德沃夏克 -> QWERTY 按物理位置重映射，挂在 ascii_composer 之后
+  "engine/processors/@after 0": "lua_processor@*dvorak_remap"
+  # 单字、繁简开关保留上次的选择：整项替换以去掉原方案里的 reset: 0，
+  # 配合 default.custom.yaml 里 switcher/save_options 的这两项。
+  "switches/@1":
+    name: zh_trad
+    states: [ 简,繁 ]
+  "switches/@6":
+    name: single_char
+    states: [ 词,单 ]
