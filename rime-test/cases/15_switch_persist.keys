@@ -1,0 +1,13 @@
+# 开关状态在会话间保留：从方案选单（Ctrl+`，按 2 展开开关列表）里打开 zh_trad
+# （第 1 页第 3 项）和 single_char（第 2 页第 3 项），关闭会话再新建一个
+# （模拟换到另一个 App 打字），两个开关应仍是打开的。
+# 用方案选单而不是 Ctrl+Shift+F/K：librime 只在方案选单里切换开关时才把
+# 状态写进 user.yaml（见 Rime/default.custom.yaml 的 switcher/save_options），
+# key_binder 的 toggle 快捷键不写，所以快捷键切换的状态不会保留。
+# 起点 0 0 是原方案 reset: 0 的默认值（简、词）；打开后的 1 1 只在新会话
+# 之后才打印，所以只有状态被保留下来才会出现。期望值见 15_switch_persist.expect。
+@options
+Control+grave 2 3
+Control+grave 2 Page_Down 3
+@new_session
+@options

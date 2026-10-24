@@ -8,6 +8,10 @@
 //   a  2  comma  space  Return  Shift+Shift_L  Release+Shift_L  Control+grave
 // 键名由 RimeGetKeycodeByName 解析，修饰键名由 RimeGetModifierByName 解析。
 // KEYFILE 中按空白分隔，# 之后到行尾为注释。
+// 两个以 @ 开头的指令不是按键：
+//   @new_session  销毁当前会话再新建一个（模拟在另一个 App 里打字；
+//                 不重启进程，选项靠 user.yaml 里保存的状态恢复）
+//   @options      打印 zh_trad、single_char 两个开关的当前值
 //
 // --dvorak：用例仍按物理 QWERTY 键写，喂给 librime 前先换成同一物理键在
 // 德沃夏克布局下的字符（模拟系统布局为德沃夏克时 Squirrel 收到的字符）。
@@ -39,6 +43,7 @@ int RimeGetKeycodeByName(const char* name);
 namespace {
 
 const int kVoidSymbol = 0xffffff;  // XK_VoidSymbol
+const int kDirective = -1;         // KeySpec 不是按键而是 @ 指令
 
 struct KeySpec {
   std::string text;
@@ -273,6 +278,16 @@ int main(int argc, char* argv[]) {
   std::vector<KeySpec> keys;
   for (const auto& t : key_texts) {
     KeySpec k;
+    if (t[0] == '@') {
+      if (t != "@new_session" && t != "@options") {
+        fprintf(stderr, "error: unknown directive '%s'\n", t.c_str());
+        return 2;
+      }
+      k.text = t;
+      k.keycode = kDirective;
+      keys.push_back(k);
+      continue;
+    }
     if (!ParseKey(t, &k))
       return 2;
     keys.push_back(k);
@@ -327,6 +342,25 @@ int main(int argc, char* argv[]) {
   PrintState(rime, session);
   for (size_t i = 0; i < keys.size(); ++i) {
     const KeySpec& k = keys[i];
+    if (k.keycode == kDirective) {
+      if (k.text == "@new_session") {
+        rime->destroy_session(session);
+        session = rime->create_session();
+        if (!session) {
+          fprintf(stderr, "error: create_session failed\n");
+          rime->finalize();
+          return 1;
+        }
+        printf("== [%zu] @new_session\n", i + 1);
+        PrintState(rime, session);
+      } else {
+        printf("== [%zu] @options\n", i + 1);
+        printf("    开关: zh_trad=%d single_char=%d\n",
+               (int)rime->get_option(session, "zh_trad"),
+               (int)rime->get_option(session, "single_char"));
+      }
+      continue;
+    }
     int keycode = k.keycode;
     if (dvorak) {
       auto it = qwerty_to_dv.find(k.keycode);
