@@ -15,6 +15,9 @@
 - **z 拼音反查**：先按物理 Z 键进入反查，再按德沃夏克字母拼拼音。
   `; ' , .` 照旧是选第二、第三候选和标点。
 - **/ 符号输入**：按物理 `/` 键进入，再按德沃夏克字母敲代码（拼音缩写，如 `/fs` 出分数）。
+- **关键字**：中文模式下按德沃夏克字母敲这些词（不用先切英文），按空格或选字：
+  `date` 日期、`time` 时间、`day` 星期、`luna` 农历、`term` 节气、`next` 功能开关（简繁、拆分等）、
+  `mode` 切方案、`help` 帮助（列出这些关键字和其他功能）。
 - **默认英文的 App**：Terminal、Ghostty、Zed、访达、Spotlight 新开会话默认英文模式，要打中文再按 Shift。
 
 ## 部署
@@ -62,6 +65,10 @@
 - z 反查和 / 符号输入时，字母原样放行，按德沃夏克字母敲；只看光标之前的编码。
 - 三个方案的 `.schema.yaml` 删了 `KP_Decimal` 发 `period` 的绑定：重发的 `period` 会被再转换成 `e`。
 - 映射表由 `rime-test/bin/gen_dvorak_map` 调系统 `UCKeyTranslate` 实测生成，不是手写的。
+- 关键字在 `Rime/rime.lua` 开头的 `rv_var` 里，按引擎实际收到的字母写（`date` 是 `hakd`，
+  换算用 `rime-test/tools/dvorak_map.tsv`）；`rv_show` 是显示给人看的德沃夏克拼写，`helper.lua` 的帮助用它。
+  这 8 个编码不是 `wubi98_ci`/`dz`/`U`（含 extended）码表里的五笔编码；`day` 的 `hat` 只是 `虐待`（hatf）、
+  `瞄向`（hatm）的前缀。
 - 其他：方案依赖 `[py, wb_spelling]`；`zh_trad`、`single_char` 去掉 `reset: 0` 并列入
   `switcher/save_options`；`app_options` 里设 App 默认英文。
 
@@ -100,6 +107,8 @@ check_dv.sh 依次：`build.sh` 编译驱动 `rime_dvtest` 和 `gen_dvorak_map`�
 
 - `<名字>.dv.keys`：德沃夏克一侧改用它（反查、符号输入要按德沃夏克字母敲）。
 - `<名字>.expect`：每行（`#` 开头和空行除外）必须整行出现在两侧输出里，核对结果本身对不对。
+- `<名字>.expect_re`：每行是扩展正则（`grep -E`），两侧输出里都要有一行匹配；日期、时间这类每次都变的内容用它核对格式。
+- `<名字>.mask`：`sed -E` 脚本，比较两侧输出前先过一遍，抹掉易变内容（两侧是前后脚跑的，可能差一秒）。
 - `<名字>.schema`：里面的方案 id 传给驱动的 `--schema`（默认 wubi98_ci）。
 
 结果和日志在 `rime-test/logs/`。单独跑一个用例（先跑过一次 check_dv.sh 或 make_users.sh）：
@@ -131,4 +140,6 @@ run_case.sh 在临时克隆里跑，不改 `user-dv`；直接调用 `rime-test/b
   取自 [rime/rime-prelude](https://github.com/rime/rime-prelude)（提交 db691d2，鼠须管 1.1.2 所带版本，LGPL-3.0）；
   `rime-test/shared/opencc/` 是鼠须管 1.1.2 里 `SharedSupport/opencc/` 的原样副本
   （[OpenCC](https://github.com/BYVoid/OpenCC)，Apache-2.0）。
+- 改了 `Rime/rime.lua` 的 `rv_var`（关键字换成德沃夏克下敲词对应的引擎字母，`week`、`nl`、`jq` 改叫 `day`、`luna`、`term`），
+  新增 `rv_show`；`Rime/lua/helper.lua` 帮助里的关键字改读 `rv_show`。各功能的实现没动。
 - 本仓库新增的是德沃夏克映射（`Rime/lua/dvorak_remap.lua` 及各方案 custom.yaml 里的相关配置）和 `rime-test/` 测试环境。

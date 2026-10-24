@@ -1,0 +1,22 @@
+# rv_var 关键字（日期、时间等）在德沃夏克下能用。按物理键写，德沃夏克一侧
+# 敲的是括号里的词；换算见 Rime/rime.lua 的 rv_var，两侧引擎收到的都是右边的字母。
+#   date -> h a k d    time -> k g m d    day  -> h a t     luna -> p f l a
+#   term -> k d o m    next -> l d b k    help -> j d p r   mode -> m s h d
+# 日期时间每天（每秒）不同：.expect_re 用正则核对格式，.mask 在两侧对比前抹掉
+# 这些候选的文字（两侧是前后脚跑的，可能差一秒）；稳定的内容（help、next、mode）
+# 仍用 .expect 整行核对。
+h a k d
+Escape
+k g m d
+Escape
+h a t
+Escape
+p f l a
+Escape
+k d o m
+Escape
+l d b k
+Escape
+j d p r
+Escape
+m s h d
