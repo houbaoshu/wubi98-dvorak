@@ -1,11 +1,11 @@
 # 在全新的 macOS 和 Linux runner 上从零跑一遍安装，检查装好的结果，再跑 rime-test。
 # 做不了的：实际打字（没有人按键，也没有前台 App 接收输入）、在系统设置里添加输入源、
-# 候选框显示。macOS 上鼠须管不会被系统拉起，见“鼠须管部署”一步的说明。
+# 候选框显示。macOS 上鼠须管不会被系统拉起，见“鼠须管自己部署”一步的说明。
 name: 安装测试
 
 on:
   push:
-    branches: [main, mac-install]  # 临时：mac-install 分支调试 CI 用，合并前删掉 mac-install
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
