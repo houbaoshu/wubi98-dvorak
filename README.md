@@ -177,7 +177,7 @@ GitHub Actions（`.github/workflows/install-test.yml`）在全新的 macOS（`ma
 （`ubuntu-24.04-arm` runner 上的 Debian 13 容器，原因见“Linux”一节）上从零跑一遍安装
 （Mac 用 `mac/install.sh --yes`，Linux 用 apt 装包再 `linux/deploy.sh --local`），核对鼠须管版本、
 字体校验和、配置与 `Rime/` 一致；macOS 上直接启动鼠须管让它自己部署（装完后系统不会拉起它），
-再经 `install.sh` 触发一次 `--reload`；两边都用 `rime_deployer` 部署并开会话确认 Lua 插件加载；
+再经 `install.sh` 触发一次 `--reload`，并确认鼠须管停着时更新配置、再启动会重新部署；两边都用 `rime_deployer` 部署并开会话确认 Lua 插件加载；
 日志里都不能有 E/F 级；最后跑 `check_dv.sh`。
 没验证的：实际打字和候选框显示（runner 上没有人按键，也没有接收输入的前台 App）、在系统设置里添加输入源。
 

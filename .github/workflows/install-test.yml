@@ -50,54 +50,56 @@ jobs:
 
       # 安装包装完提示要注销重新登录，鼠须管没有被系统拉起，输入源里也还没有它，
       # 所以 install.sh 第 4 步走的是“没在运行”。鼠须管平时由系统在切换到它时拉起；
-      # 这里直接启动它，它启动时用自己的 librime 和 Lua 插件部署 ~/Library/Rime
-      # （日志 $TMPDIR/rime.squirrel.*），再经 install.sh 触发一次 --reload。
-      # glog 把 INFO 级缓冲在内存里，WARNING 及以上立即写盘；部署出错时会有 E 级。
-      # 所以完成信号用 user.yaml 里的 var/last_build_time（部署结束时写），
-      # 出错与否在鼠须管运行时查 E/F 级（退出后日志文件在 runner 上找不到了）。
-      - name: 鼠须管自己部署（直接启动，再经 install.sh 触发 --reload）
-        timeout-minutes: 6
+      # 这里直接启动它，它启动时用自己的 librime 和 Lua 插件部署 ~/Library/Rime。
+      # 日志在 $TMPDIR/rime.squirrel/ 下（每次启动一组文件，加 INFO/WARNING/ERROR 符号链接）；
+      # glog 把 INFO 级缓冲在内存里，进程退出才写全，所以完成信号用 user.yaml 里的
+      # var/last_build_time（部署结束时写），日志等鼠须管退出后再查。
+      # 依次检查：
+      #   1. 首次启动部署，产物齐全；运行中经 install.sh 触发 --reload，鼠须管收到。
+      #   2. 已编译方案里没有 dvorak_remap（模拟旧安装）时，鼠须管停着运行 install.sh，
+      #      再启动要重新部署，编译结果里有 dvorak_remap（install.sh 同步后 touch 目标目录）。
+      #   3. 所有日志：找得到，没有 ERROR 文件、没有 E/F 级，每次部署都是 0 failure。
+      - name: 鼠须管自己部署（直接启动、--reload、更新后重启）
+        timeout-minutes: 10
         run: |
           sq="/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel"
-          tmp=${TMPDIR:-/tmp}
-          logs=$RUNNER_TEMP/squirrel-logs
-          mkdir -p "$logs"
-          "$sq" > "$logs/squirrel.out" 2>&1 &
-          pid=$!
+          logdir=${TMPDIR:-/tmp}/rime.squirrel
+          rime=~/Library/Rime
+          out=$RUNNER_TEMP/squirrel-logs
+          mkdir -p "$out"
+          pid=
+          start() {  # start 名字：启动鼠须管，stdout/stderr 写 $out/名字.out
+            "$sq" > "$out/$1.out" 2>&1 &
+            pid=$!
+          }
           quit() {
+            [ -n "$pid" ] || return 0
             "$sq" --quit || true
             for i in $(seq 1 15); do
-              kill -0 $pid 2>/dev/null || return 0
+              kill -0 $pid 2>/dev/null || break
               sleep 1
             done
             kill $pid 2>/dev/null || true
+            pid=
           }
-          check_errors() {  # 查日志里的 E/F 级，并把日志留一份
-            ls -la "$tmp"/rime.squirrel* 2>/dev/null || echo "（$tmp 下没有 rime.squirrel 日志）"
-            cp -L "$tmp"/rime.squirrel.* "$logs/" 2>/dev/null || true
-            errors=$(grep -hsE '^[EF][0-9]' "$tmp"/rime.squirrel.*.log || true)
-            if [ -n "$errors" ] || [ -e "$tmp/rime.squirrel.ERROR" ]; then
-              echo "error: 鼠须管日志里有 E/F 级：" >&2
-              echo "$errors" >&2
-              exit 1
-            fi
-            echo "鼠须管日志 E/F 级 0 行"
-          }
-          # 不论成败：退出鼠须管，删掉 build/ 让 rime_deployer 从头部署
-          trap 'quit; rm -rf ~/Library/Rime/build' EXIT
-          for i in $(seq 1 90); do
-            grep -qs last_build_time ~/Library/Rime/user.yaml && break
-            sleep 2
-          done
-          if ! grep -qs last_build_time ~/Library/Rime/user.yaml; then
-            echo "error: 鼠须管 3 分钟内没有部署完" >&2
+          build_time() { sed -n 's/^ *last_build_time: *//p' "$rime/user.yaml" 2>/dev/null; }
+          wait_deploy() {  # wait_deploy 旧值：等 last_build_time 变成别的值，最多 3 分钟
+            for i in $(seq 1 90); do
+              t=$(build_time)
+              [ -n "$t" ] && [ "$t" != "$1" ] && { echo "部署完：last_build_time=$t"; return 0; }
+              sleep 2
+            done
+            echo "error: 鼠须管 3 分钟内没有部署（last_build_time 仍是 ${1:-空}）" >&2
             ps -o pid,stat,etime,command -p $pid || echo "鼠须管已退出"
-            check_errors
-            exit 1
-          fi
-          echo "部署完：$(grep -A1 last_build_time ~/Library/Rime/user.yaml | tr -s ' \n' ' ')"
-          b=~/Library/Rime/build
-          ls "$b"
+            return 1
+          }
+          # 不论成败：退出鼠须管，归档日志，删掉 build/ 让后面的 rime_deployer 从头部署
+          trap 'quit; cp -RL "$logdir" "$out/" 2>/dev/null || true; rm -rf "$rime/build"' EXIT
+
+          echo "== 1. 首次启动部署"
+          start first
+          wait_deploy ""
+          b=$rime/build
           for f in default.yaml squirrel.yaml py.schema.yaml py.prism.bin py.table.bin \
                    wb_spelling.prism.bin wb_spelling.table.bin; do
             test -f "$b/$f" || { echo "error: 没有生成 build/$f" >&2; exit 1; }
@@ -107,18 +109,68 @@ jobs:
               test -f "$b/$f" || { echo "error: 没有生成 build/$f" >&2; exit 1; }
             done
           done
-          check_errors
-
+          grep -q dvorak_remap "$b/wubi98_ci.schema.yaml"
+          echo "产物齐全"
           # 鼠须管在运行时，install.sh 第 4 步应调用 Squirrel --reload
+          t=$(build_time)
+          sleep 2
           mac/install.sh --yes | tee "$RUNNER_TEMP/reload.log"
           grep -q '已通知鼠须管重新部署' "$RUNNER_TEMP/reload.log"
-          sleep 10
-          check_errors
+          wait_deploy "$t"
           quit
-          # 鼠须管的 stdout 写文件时有缓冲，退出后才写全
-          cat "$logs/squirrel.out"
-          grep -q 'Reloading rime on demand' "$logs/squirrel.out"
-          echo "鼠须管部署完成，--reload 已收到"
+          # stdout 写文件时有缓冲，退出后才写全
+          grep -q 'Reloading rime on demand' "$out/first.out"
+          echo "--reload 已收到并重新部署"
+
+          echo "== 2. 旧编译结果没有 dvorak_remap，鼠须管停着更新，再启动"
+          sed -i '' '/dvorak_remap/d' "$rime/wubi98_ci.custom.yaml"
+          t=$(build_time)
+          sleep 2
+          start old
+          wait_deploy "$t"
+          quit
+          if grep -q dvorak_remap "$rime/build/wubi98_ci.schema.yaml"; then
+            echo "error: 模拟旧安装失败，编译结果里还有 dvorak_remap" >&2
+            exit 1
+          fi
+          echo "旧编译结果里没有 dvorak_remap"
+          t=$(build_time)
+          sleep 2
+          mac/install.sh --yes | tee "$RUNNER_TEMP/update.log"
+          grep -q '鼠须管没在运行' "$RUNNER_TEMP/update.log"
+          grep -q dvorak_remap "$rime/wubi98_ci.custom.yaml"
+          start updated
+          wait_deploy "$t"
+          quit
+          grep -q dvorak_remap "$rime/build/wubi98_ci.schema.yaml"
+          echo "更新后重启：编译结果里有 dvorak_remap"
+
+          echo "== 3. 鼠须管日志（${logdir}）"
+          ls -la "$logdir"
+          infos=$(ls "$logdir"/rime.squirrel.*.log.INFO.*.log 2>/dev/null || true)
+          if [ -z "$infos" ]; then
+            echo "error: $logdir 下没有鼠须管的 INFO 日志" >&2
+            exit 1
+          fi
+          echo "$infos" | wc -l | xargs echo "INFO 日志个数："
+          if [ -e "$logdir/rime.squirrel.ERROR" ]; then
+            echo "error: 有 ERROR 日志" >&2
+            cat "$logdir/rime.squirrel.ERROR" >&2
+            exit 1
+          fi
+          errors=$(cat "$logdir"/*.log | grep -E '^[EF][0-9]' || true)
+          if [ -n "$errors" ]; then
+            echo "error: 鼠须管日志里有 E/F 级：" >&2
+            echo "$errors" >&2
+            exit 1
+          fi
+          finished=$(cat "$logdir"/*.log | grep -h 'finished updating schemas' | sed 's/^.*\] //' || true)
+          echo "$finished"
+          if [ -z "$finished" ] || echo "$finished" | grep -qv ', 0 failure'; then
+            echo "error: 没有部署记录，或有部署失败" >&2
+            exit 1
+          fi
+          echo "鼠须管日志：E/F 级 0 行，$(echo "$finished" | wc -l | xargs) 次部署都是 0 failure"
 
       - name: 准备 rime-test（librime 1.16.0 发布包，编译驱动）
         run: |
