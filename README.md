@@ -33,6 +33,6 @@ curl -fsSL https://raw.githubusercontent.com/houbaoshu/wubi98-dvorak/main/instal
 - `/`：符号输入
 - `date` 日期、`time` 时间、`day` 星期、`luna` 农历、`term` 节气
 
-## 字体
+## 来源
 
-98WB 字体来自 98 五笔小组（yanhuacuo），原仓库 https://github.com/yanhuacuo/98wubi-unicode ，版权归原作者所有。本仓库不含字体文件，安装时从原仓库下载。
+码表来自 yanhuacuo，方案配置来自 98 五笔资源库（http://www.98wubi.com ，https://github.com/98wb ），98WB 字体（https://github.com/yanhuacuo/98wubi-unicode ）版权归原作者，本仓库不含字体文件。
