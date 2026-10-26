@@ -14,10 +14,10 @@
 # Mac 上的修改时间，所以先 touch 目标目录，再 ibus restart。部署发生在 Rime
 # 引擎下次启动时（切到 Rime 输入源），日志在 /tmp/rime.ibus.*。
 #
-# 字体：98WB 字体不在仓库里，从本机 ~/Library/Fonts/98WB-*.otf 复制到
-# ~/.local/share/fonts/98WB/（本机没有就跳过）；linux/fontconfig/ 下的配置装到
-# ~/.config/fontconfig/conf.d/，然后 fc-cache -f。GNOME 的候选框由 gnome-shell 画，
-# 它只在启动时读字体列表，字体或这份配置有变化时要注销重新登录。
+# 字体：linux/fontconfig/ 下的配置装到 ~/.config/fontconfig/conf.d/；98WB 字体不在
+# 仓库里，在远端执行 linux/install-fonts.sh 从原仓库下载安装（已装好就跳过），
+# 它最后运行 fc-cache -f。GNOME 的候选框由 gnome-shell 画，它只在启动时读字体列表，
+# 字体或这份配置有变化时要注销重新登录。
 set -eu
 if [ $# -ne 1 ]; then
   echo "usage: linux/deploy.sh USER@HOST" >&2
@@ -37,16 +37,9 @@ rsync -a --backup --backup-dir="$backup" \
 rsync -a --backup --backup-dir="$backup" \
   "$repo/linux/ibus_rime.custom.yaml" "$host:$dest/"
 
-fonts=$(ls "$HOME"/Library/Fonts/98WB-*.otf 2>/dev/null || true)
-ssh "$host" "mkdir -p .local/share/fonts/98WB .config/fontconfig/conf.d"
-if [ -n "$fonts" ]; then
-  # shellcheck disable=SC2086
-  rsync -a $fonts "$host:.local/share/fonts/98WB/"
-else
-  echo "本机没有 ~/Library/Fonts/98WB-*.otf，跳过字体复制" >&2
-fi
+ssh "$host" "mkdir -p .config/fontconfig/conf.d"
 rsync -a "$repo/linux/fontconfig/" "$host:.config/fontconfig/conf.d/"
-ssh "$host" "fc-cache -f"
+ssh "$host" 'sh -s' < "$repo/linux/install-fonts.sh"
 
 ssh "$host" "touch $dest && ibus restart"
 echo "已同步到 $host:~/$dest 并重启 ibus；切到 Rime 后部署，日志见 /tmp/rime.ibus.*"
