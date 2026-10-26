@@ -1,5 +1,7 @@
 # 98 五笔 + 德沃夏克（鼠须管 / Rime）
 
+[![安装测试](https://github.com/houbaoshu/wubi98-dvorak/actions/workflows/install-test.yml/badge.svg)](https://github.com/houbaoshu/wubi98-dvorak/actions/workflows/install-test.yml)
+
 系统键盘布局固定为德沃夏克，只留鼠须管一个输入源：英文按德沃夏克打，
 中文按物理 QWERTY 键位打 98 五笔，不用来回切换系统输入源。
 
@@ -20,7 +22,49 @@
   `mode` 切方案、`help` 帮助（列出这些关键字和其他功能）。
 - **默认英文的 App**：Terminal、Ghostty、Zed、访达、Spotlight 新开会话默认英文模式，要打中文再按 Shift。
 
-## 部署
+## Mac 安装
+
+在一台新 Mac 上从零安装：克隆仓库（没有 git 时系统会提示安装命令行工具，也可以在 GitHub 上下载 zip 解压），
+在仓库根目录运行：
+
+```sh
+mac/install.sh
+```
+
+脚本依次：
+
+1. **鼠须管**：没装时下载官方 1.1.2 安装包（固定这个版本，不装最新版），按脚本里记录的 SHA-256 校验，
+   缓存在 `~/Library/Caches/wubi98-dvorak/`。安装要管理员密码，脚本不代为安装，只打印命令
+   （`sudo installer -pkg … -target /`，或 `open …` 用图形安装器），你装好后回到脚本按回车继续。
+   已装了别的版本时只提示，不替换。
+2. **字体**：`fonts/install-fonts.sh`（与 Linux 共用）下载 98WB 六个字体，校验后装到 `~/Library/Fonts`。
+3. **同步**：`Rime/` 同步到 `~/Library/Rime`，排除项与下面“手动部署”相同。按校验和比较，只覆盖内容不同的文件，
+   被覆盖的旧文件挪到 `~/Library/Rime.backup-<时间>`；目标里旧版 98 五笔留下的 `opencc/` 下 5 个文件
+   和 `symbols.yaml`、`key_bindings.yaml`、`punctuation.yaml`（见“来源说明”）也挪到这里。
+   没有被覆盖的文件时不建备份目录。
+4. **重新部署**：鼠须管在运行时执行 `Squirrel --reload`，等于菜单里的“重新部署”；没在运行时，切到鼠须管时自动部署。
+
+可以重复运行：鼠须管已装、安装包已下载、字体已装好且校验相同的都跳过，同步只动有变化的文件。
+
+装完还要你在系统里确认：
+
+- 系统设置 → 键盘 → 文字输入 → 输入法“编辑…”，列表里要有“鼠须管”。鼠须管的安装包装完会尝试自动启用；
+  没有就点“+”在简体中文下添加，刚装完找不到时注销重新登录。
+- 系统键盘布局保持“Dvorak”（英语）。
+- 候选框里的拆分字根显示成方块时，重新登录一次。
+
+加 `--yes` 时，需要装鼠须管就直接运行 `sudo installer`，不等回车（CI 用，平时不加）。
+先在临时目录里试同步和备份（目标不是 `~/Library/Rime` 时不触发重新部署）：
+
+```sh
+mac/install.sh --target /tmp/rime-try --font-dir /tmp/fonts-try
+```
+
+回滚：把 `~/Library/Rime.backup-<时间>` 里的文件拷回 `~/Library/Rime`，重新部署。
+
+## 手动部署（Mac）
+
+`mac/install.sh` 的第 3、4 步做的是同样的事，只是备份方式不同：脚本只备份被覆盖的文件，下面是整份备份。
 
 1. 备份：
 
@@ -82,11 +126,10 @@ macOS 和 Linux 上都能跑。macOS 上用与鼠须管 1.1.2 同版本的 libri
 macOS：
 
 1. 下载 [librime 1.16.0 发布页](https://github.com/rime/librime/releases/tag/1.16.0)
-   的 `rime-a251145-macOS-universal.tar.bz2`，放到 `rime-test/vendor/dl/`，解压到 `rime-test/vendor/`：
+   的 `rime-a251145-macOS-universal.tar.bz2`，按记录的 SHA-256 校验后解压到 `rime-test/vendor/`：
 
    ```sh
-   mkdir -p rime-test/vendor/dl
-   tar xjf rime-test/vendor/dl/rime-a251145-macOS-universal.tar.bz2 -C rime-test/vendor
+   rime-test/tools/fetch_librime.sh
    ```
 
    解压后应有 `rime-test/vendor/dist/lib/librime.1.dylib` 和
@@ -128,12 +171,22 @@ rime-test/tools/run_case.sh rime-test/user-dv /dev/null --dvorak a a a b   # 键
 
 run_case.sh 在临时克隆里跑，不改 `user-dv`；直接调用 `rime-test/bin/rime_dvtest` 会把会话写入留在用户目录里。
 
+## CI
+
+GitHub Actions（`.github/workflows/install-test.yml`）在全新的 macOS（`macos-26`）和 Linux
+（`ubuntu-24.04-arm` runner 上的 Debian 13 容器，原因见“Linux”一节）上从零跑一遍安装
+（Mac 用 `mac/install.sh --yes`，Linux 用 apt 装包再 `linux/deploy.sh --local`），核对鼠须管版本、
+字体校验和、配置与 `Rime/` 一致；macOS 上直接启动鼠须管让它自己部署（装完后系统不会拉起它），
+再经 `install.sh` 触发一次 `--reload`，并确认鼠须管停着时更新配置、再启动会重新部署；两边都用 `rime_deployer` 部署并开会话确认 Lua 插件加载；
+日志里都不能有 E/F 级；最后跑 `check_dv.sh`。
+没验证的：实际打字和候选框显示（runner 上没有人按键，也没有接收输入的前台 App）、在系统设置里添加输入源。
+
 ## Linux（ibus-rime）
 
 在 Debian 13 arm64 + GNOME 48（Wayland）+ ibus-rime 1.5.1 / librime 1.13.1 上跑通。
 `Rime/` 是两边共用的配置；`squirrel.custom.yaml` 只用于 Mac，同步到 Linux 时排除；
 Linux 专属的放在 `linux/`：`ibus_rime.custom.yaml`（候选竖排、编码不嵌入）、
-`fontconfig/`（候选框字体回退）、`install-fonts.sh`（下载安装 98WB 字体）和 `deploy.sh`。
+`fontconfig/`（候选框字体回退）和 `deploy.sh`。下载安装 98WB 字体的 `fonts/install-fonts.sh` 与 Mac 共用。
 
 1. 安装：
 
@@ -143,25 +196,31 @@ Linux 专属的放在 `linux/`：`ibus_rime.custom.yaml`（候选竖排、编码
 
    `libopencc-data` 提供繁简转换的 `s2t.json`（Debian 的 rime 包里没有）。
 
+   Ubuntu 24.04 的包名相同，但版本太旧（librime 1.10、librime-plugin-lua git20230917），
+   librime-lua 没有 `KeyEvent(keycode, modifier)` 构造，`dvorak_remap.lua` 每次转换都报
+   `parse error: unrecognized key '47'`，中文模式下的德沃夏克转换不能用。所以 CI 也在 Debian 13 容器里跑。
+
 2. 在 Mac 的仓库根目录同步并重启 ibus（被覆盖的旧文件挪到 `~/.config/ibus/rime.backup-<时间>`）：
 
    ```sh
    linux/deploy.sh 用户@主机
    ```
 
+   在 Linux 本机的仓库里运行 `linux/deploy.sh --local`，做的事相同（CI 用这个）。
+
    切到 Rime 时 ibus-rime 自动部署，日志在 `/tmp/rime.ibus.*`。
    脚本同时把 `linux/fontconfig/` 装到 `~/.config/fontconfig/conf.d/`，并在远端执行
-   `linux/install-fonts.sh` 安装字体（见第 4 步）。
+   `fonts/install-fonts.sh` 安装字体（见第 4 步）。
 
 3. 输入源：设置 → 键盘 → 输入源，依次是“英语（Dvorak）”和“中文（Rime）”。
    Rime 引擎的布局是 `default`，GNOME 会沿用前一个 XKB 布局，所以 Rime 收到的是德沃夏克字符，
    和 Mac 上 `keyboard_layout: Dvorak` 一样，`dvorak_remap.lua` 不用改。
 
-4. 字体：本仓库不包含字体文件。`linux/install-fonts.sh` 从原仓库
+4. 字体：本仓库不包含字体文件。`fonts/install-fonts.sh` 从原仓库
    [yanhuacuo/98wubi-unicode](https://github.com/yanhuacuo/98wubi-unicode) 的 release v1.0.0 附件
    `Ubuntu-22.04-LTS.tar.xz` 里取出 98WB-0、98WB-1、98WB-2、98WB-3、98WB-U、98WB-V 六个字体，
    按脚本里记录的 SHA-256 校验后装到 `~/.local/share/fonts/98WB`，再 `fc-cache -f`；已装好就不再下载。
-   也可以在 Linux 上单独运行 `sh linux/install-fonts.sh`。
+   也可以在 Linux 上单独运行 `sh fonts/install-fonts.sh`。
 
    GNOME 的候选框由 gnome-shell 画，字体是 Shell 主题的 Cantarell，
    拆分字根和超集生僻字都靠 fontconfig 回退。gnome-shell 只在启动时读字体列表，
@@ -198,11 +257,11 @@ Linux 专属的放在 `linux/`：`ibus_rime.custom.yaml`（候选竖排、编码
     设了 `menu/alternative_select_keys` 时选择下标差 1。
 - 98WB 字体（98WB-0、98WB-1、98WB-2、98WB-3、98WB-U、98WB-V）来自 98 五笔小组（yanhuacuo），
   原仓库 https://github.com/yanhuacuo/98wubi-unicode ，版权归原作者所有。
-  本仓库不包含字体文件，`linux/install-fonts.sh` 安装时从原仓库下载。
+  本仓库不包含字体文件，`fonts/install-fonts.sh` 安装时从原仓库下载。
 - `rime-test/shared/` 下的 `default.yaml`、`key_bindings.yaml`、`punctuation.yaml`、`symbols.yaml`
   取自 [rime/rime-prelude](https://github.com/rime/rime-prelude)（提交 db691d2，鼠须管 1.1.2 所带版本，LGPL-3.0）；
   `rime-test/shared/opencc/` 是鼠须管 1.1.2 里 `SharedSupport/opencc/` 的原样副本
   （[OpenCC](https://github.com/BYVoid/OpenCC)，Apache-2.0）。
 - 改了 `Rime/rime.lua` 的 `rv_var`（关键字换成德沃夏克下敲词对应的引擎字母，`week`、`nl`、`jq` 改叫 `day`、`luna`、`term`），
   新增 `rv_show`；`Rime/lua/helper.lua` 帮助里的关键字改读 `rv_show`。各功能的实现没动。
-- 本仓库新增的是德沃夏克映射（`Rime/lua/dvorak_remap.lua` 及各方案 custom.yaml 里的相关配置）、`linux/` 和 `rime-test/` 测试环境。
+- 本仓库新增的是德沃夏克映射（`Rime/lua/dvorak_remap.lua` 及各方案 custom.yaml 里的相关配置）、`mac/`、`linux/`、`fonts/` 里的安装脚本和 `rime-test/` 测试环境。

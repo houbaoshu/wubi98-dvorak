@@ -1,0 +1,254 @@
+# 在全新的 macOS 和 Linux runner 上从零跑一遍安装，检查装好的结果，再跑 rime-test。
+# 做不了的：实际打字（没有人按键，也没有前台 App 接收输入）、在系统设置里添加输入源、
+# 候选框显示。macOS 上鼠须管不会被系统拉起，见“鼠须管自己部署”一步的说明。
+name: 安装测试
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash  # bash -eo pipefail
+
+jobs:
+  macos:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 安装（mac/install.sh --yes：鼠须管 1.1.2、字体、同步配置）
+        run: mac/install.sh --yes
+
+      - name: 检查鼠须管版本
+        run: |
+          app="/Library/Input Methods/Squirrel.app"
+          v=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")
+          echo "鼠须管 $v"
+          test "$v" = 1.1.2
+
+      - name: 检查字体
+        run: sh fonts/install-fonts.sh --check
+
+      - name: 检查 ~/Library/Rime 与 Rime/ 一致
+        run: |
+          diff -r -x build -x sync -x trash -x '*.userdb' -x user.yaml \
+            -x installation.yaml -x wubi98_ci.txt Rime ~/Library/Rime
+          echo "一致"
+
+      - name: 重复运行安装（应全部跳过，不建备份目录）
+        run: |
+          mac/install.sh --yes | tee "$RUNNER_TEMP/rerun.log"
+          grep -q '已装鼠须管 1.1.2，跳过' "$RUNNER_TEMP/rerun.log"
+          grep -q '98WB 字体已装好' "$RUNNER_TEMP/rerun.log"
+          if ls -d ~/Library/Rime.backup-* 2>/dev/null; then
+            echo "error: 重复运行建了备份目录" >&2
+            exit 1
+          fi
+
+      # 安装包装完提示要注销重新登录，鼠须管没有被系统拉起，输入源里也还没有它，
+      # 所以 install.sh 第 4 步走的是“没在运行”。鼠须管平时由系统在切换到它时拉起；
+      # 这里直接启动它，它启动时用自己的 librime 和 Lua 插件部署 ~/Library/Rime。
+      # 日志在 $TMPDIR/rime.squirrel/ 下（每次启动一组文件，加 INFO/WARNING/ERROR 符号链接）；
+      # glog 把 INFO 级缓冲在内存里，进程退出才写全，所以完成信号用 user.yaml 里的
+      # var/last_build_time（部署结束时写），日志等鼠须管退出后再查。
+      # 依次检查：
+      #   1. 首次启动部署，产物齐全；运行中经 install.sh 触发 --reload，鼠须管收到。
+      #   2. 已编译方案里没有 dvorak_remap（模拟旧安装）时，鼠须管停着运行 install.sh，
+      #      再启动要重新部署，编译结果里有 dvorak_remap（install.sh 同步后 touch 目标目录）。
+      #   3. 所有日志：找得到，没有 ERROR 文件、没有 E/F 级，每次部署都是 0 failure。
+      - name: 鼠须管自己部署（直接启动、--reload、更新后重启）
+        timeout-minutes: 10
+        run: |
+          sq="/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel"
+          logdir=${TMPDIR:-/tmp}/rime.squirrel
+          rime=~/Library/Rime
+          out=$RUNNER_TEMP/squirrel-logs
+          mkdir -p "$out"
+          pid=
+          start() {  # start 名字：启动鼠须管，stdout/stderr 写 $out/名字.out
+            "$sq" > "$out/$1.out" 2>&1 &
+            pid=$!
+          }
+          quit() {
+            [ -n "$pid" ] || return 0
+            "$sq" --quit || true
+            for i in $(seq 1 15); do
+              kill -0 $pid 2>/dev/null || break
+              sleep 1
+            done
+            kill $pid 2>/dev/null || true
+            pid=
+          }
+          build_time() { sed -n 's/^ *last_build_time: *//p' "$rime/user.yaml" 2>/dev/null || true; }
+          wait_deploy() {  # wait_deploy 旧值：等 last_build_time 变成别的值，最多 3 分钟
+            for i in $(seq 1 90); do
+              t=$(build_time)
+              [ -n "$t" ] && [ "$t" != "$1" ] && { echo "部署完：last_build_time=$t"; return 0; }
+              sleep 2
+            done
+            echo "error: 鼠须管 3 分钟内没有部署（last_build_time 仍是 ${1:-空}）" >&2
+            ps -o pid,stat,etime,command -p $pid || echo "鼠须管已退出"
+            return 1
+          }
+          # 不论成败：退出鼠须管，归档日志，删掉 build/ 让后面的 rime_deployer 从头部署
+          trap 'quit; cp -RL "$logdir" "$out/" 2>/dev/null || true; rm -rf "$rime/build"' EXIT
+
+          echo "== 1. 首次启动部署"
+          start first
+          wait_deploy ""
+          b=$rime/build
+          for f in default.yaml squirrel.yaml py.schema.yaml py.prism.bin py.table.bin \
+                   wb_spelling.prism.bin wb_spelling.table.bin; do
+            test -f "$b/$f" || { echo "error: 没有生成 build/$f" >&2; exit 1; }
+          done
+          for s in wubi98_ci wubi98_dz wubi98_U; do
+            for f in $s.schema.yaml $s.extended.prism.bin $s.extended.table.bin; do
+              test -f "$b/$f" || { echo "error: 没有生成 build/$f" >&2; exit 1; }
+            done
+          done
+          grep -q dvorak_remap "$b/wubi98_ci.schema.yaml"
+          echo "产物齐全"
+          # 鼠须管在运行时，install.sh 第 4 步应调用 Squirrel --reload
+          t=$(build_time)
+          sleep 2
+          mac/install.sh --yes | tee "$RUNNER_TEMP/reload.log"
+          grep -q '已通知鼠须管重新部署' "$RUNNER_TEMP/reload.log"
+          wait_deploy "$t"
+          quit
+          # stdout 写文件时有缓冲，退出后才写全
+          grep -q 'Reloading rime on demand' "$out/first.out"
+          echo "--reload 已收到并重新部署"
+
+          echo "== 2. 旧编译结果没有 dvorak_remap，鼠须管停着更新，再启动"
+          sed -i '' '/dvorak_remap/d' "$rime/wubi98_ci.custom.yaml"
+          t=$(build_time)
+          sleep 2
+          start old
+          wait_deploy "$t"
+          quit
+          if grep -q dvorak_remap "$rime/build/wubi98_ci.schema.yaml"; then
+            echo "error: 模拟旧安装失败，编译结果里还有 dvorak_remap" >&2
+            exit 1
+          fi
+          echo "旧编译结果里没有 dvorak_remap"
+          t=$(build_time)
+          sleep 2
+          mac/install.sh --yes | tee "$RUNNER_TEMP/update.log"
+          grep -q '鼠须管没在运行' "$RUNNER_TEMP/update.log"
+          grep -q dvorak_remap "$rime/wubi98_ci.custom.yaml"
+          start updated
+          wait_deploy "$t"
+          quit
+          grep -q dvorak_remap "$rime/build/wubi98_ci.schema.yaml"
+          echo "更新后重启：编译结果里有 dvorak_remap"
+
+          echo "== 3. 鼠须管日志（${logdir}）"
+          ls -la "$logdir" || true
+          infos=$(ls "$logdir"/rime.squirrel.*.log.INFO.*.log 2>/dev/null || true)
+          if [ -z "$infos" ]; then
+            echo "error: $logdir 下没有鼠须管的 INFO 日志" >&2
+            exit 1
+          fi
+          echo "$infos" | wc -l | xargs echo "INFO 日志个数："
+          if [ -e "$logdir/rime.squirrel.ERROR" ]; then
+            echo "error: 有 ERROR 日志" >&2
+            cat "$logdir/rime.squirrel.ERROR" >&2
+            exit 1
+          fi
+          errors=$(cat "$logdir"/*.log | grep -E '^[EF][0-9]' || true)
+          if [ -n "$errors" ]; then
+            echo "error: 鼠须管日志里有 E/F 级：" >&2
+            echo "$errors" >&2
+            exit 1
+          fi
+          finished=$(cat "$logdir"/*.log | grep -h 'finished updating schemas' | sed 's/^.*\] //' || true)
+          echo "$finished"
+          if [ -z "$finished" ] || echo "$finished" | grep -qv ', 0 failure'; then
+            echo "error: 没有部署记录，或有部署失败" >&2
+            exit 1
+          fi
+          echo "鼠须管日志：E/F 级 0 行，$(echo "$finished" | wc -l | xargs) 次部署都是 0 failure"
+
+      - name: 准备 rime-test（librime 1.16.0 发布包，编译驱动）
+        run: |
+          rime-test/tools/fetch_librime.sh
+          rime-test/tools/build.sh
+
+      - name: 部署（rime_deployer）并确认 Lua 插件能加载
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: rime-test/tools/check_install.sh ~/Library/Rime "/Library/Input Methods/Squirrel.app/Contents/SharedSupport"
+
+      - name: rime-test（check_dv.sh）
+        run: rime-test/tools/check_dv.sh
+
+      - name: 上传日志
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: logs-macos
+          path: |
+            rime-test/logs/
+            ${{ runner.temp }}/check_install.*
+            ${{ runner.temp }}/squirrel-logs/
+          if-no-files-found: ignore
+
+  linux:
+    runs-on: ubuntu-24.04-arm
+    # 在 Debian 13 容器里跑，与测试虚拟机相同。Ubuntu 24.04 自带的 librime-plugin-lua
+    # （git20230917）没有 KeyEvent(keycode, modifier) 构造，dvorak_remap.lua 在那里不能用
+    # （会话日志 "parse error: unrecognized key '47'"），见 README“Linux”一节。
+    container: debian:trixie
+    steps:
+      - name: 安装软件包
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ibus-rime librime-plugin-lua librime-bin libopencc-data rsync \
+            g++ pkgconf librime-dev libxkbcommon-dev \
+            git ca-certificates curl xz-utils perl
+          dpkg-query -W ibus-rime librime-plugin-lua librime-bin libopencc-data 'librime1*' librime-data || true
+
+      - uses: actions/checkout@v5
+
+      - name: 同步配置、装字体（linux/deploy.sh --local）
+        run: linux/deploy.sh --local
+
+      - name: 检查字体
+        run: sh fonts/install-fonts.sh --check
+
+      - name: 检查 ~/.config/ibus/rime 与 Rime/ 一致
+        run: |
+          d=~/.config/ibus/rime
+          diff -r -x build -x sync -x trash -x '*.userdb' -x user.yaml \
+            -x installation.yaml -x wubi98_ci.txt \
+            -x squirrel.custom.yaml -x ibus_rime.custom.yaml Rime "$d"
+          cmp linux/ibus_rime.custom.yaml "$d/ibus_rime.custom.yaml"
+          test ! -e "$d/squirrel.custom.yaml"
+          diff -r linux/fontconfig ~/.config/fontconfig/conf.d
+          echo "一致"
+
+      - name: 部署（rime_deployer）并确认 Lua 插件能加载
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          rime-test/tools/build.sh
+          rime-test/tools/check_install.sh ~/.config/ibus/rime /usr/share/rime-data
+
+      - name: rime-test（系统共享数据，check_dv.sh）
+        env:
+          RIME_TEST_SHARED: /usr/share/rime-data
+        run: rime-test/tools/check_dv.sh
+
+      - name: 上传日志
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: logs-linux
+          path: |
+            rime-test/logs/
+            ${{ runner.temp }}/check_install.*
+          if-no-files-found: ignore
