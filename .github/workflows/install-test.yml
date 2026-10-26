@@ -52,14 +52,14 @@ jobs:
       # 所以 install.sh 第 4 步走的是“没在运行”。鼠须管平时由系统在切换到它时拉起；
       # 这里直接启动它，它启动时用自己的 librime 和 Lua 插件部署 ~/Library/Rime
       # （日志 $TMPDIR/rime.squirrel.*），再经 install.sh 触发一次 --reload。
-      # glog 把 INFO 日志缓冲在内存里，进程退出才写全，所以先等 user.yaml 里出现
-      # var/last_build_time（部署结束时写），让鼠须管退出后再查日志。
+      # glog 把 INFO 级缓冲在内存里，WARNING 及以上立即写盘；部署出错时会有 E 级。
+      # 所以完成信号用 user.yaml 里的 var/last_build_time（部署结束时写），
+      # 出错与否在鼠须管运行时查 E/F 级（退出后日志文件在 runner 上找不到了）。
       - name: 鼠须管自己部署（直接启动，再经 install.sh 触发 --reload）
         timeout-minutes: 6
         run: |
           sq="/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel"
           tmp=${TMPDIR:-/tmp}
-          log=$tmp/rime.squirrel.INFO
           logs=$RUNNER_TEMP/squirrel-logs
           mkdir -p "$logs"
           "$sq" > "$logs/squirrel.out" 2>&1 &
@@ -72,8 +72,19 @@ jobs:
             done
             kill $pid 2>/dev/null || true
           }
-          # 不论成败：退出鼠须管，留下日志，删掉 build/ 让 rime_deployer 从头部署
-          trap 'quit; cp -L "$tmp"/rime.squirrel.* "$logs/" 2>/dev/null || true; rm -rf ~/Library/Rime/build' EXIT
+          check_errors() {  # 查日志里的 E/F 级，并把日志留一份
+            ls -la "$tmp"/rime.squirrel* 2>/dev/null || echo "（$tmp 下没有 rime.squirrel 日志）"
+            cp -L "$tmp"/rime.squirrel.* "$logs/" 2>/dev/null || true
+            errors=$(grep -hsE '^[EF][0-9]' "$tmp"/rime.squirrel.*.log || true)
+            if [ -n "$errors" ] || [ -e "$tmp/rime.squirrel.ERROR" ]; then
+              echo "error: 鼠须管日志里有 E/F 级：" >&2
+              echo "$errors" >&2
+              exit 1
+            fi
+            echo "鼠须管日志 E/F 级 0 行"
+          }
+          # 不论成败：退出鼠须管，删掉 build/ 让 rime_deployer 从头部署
+          trap 'quit; rm -rf ~/Library/Rime/build' EXIT
           for i in $(seq 1 90); do
             grep -qs last_build_time ~/Library/Rime/user.yaml && break
             sleep 2
@@ -81,34 +92,33 @@ jobs:
           if ! grep -qs last_build_time ~/Library/Rime/user.yaml; then
             echo "error: 鼠须管 3 分钟内没有部署完" >&2
             ps -o pid,stat,etime,command -p $pid || echo "鼠须管已退出"
-            ls -la "$tmp"/rime.squirrel* 2>/dev/null || echo "没有 rime.squirrel 日志"
+            check_errors
             exit 1
           fi
           echo "部署完：$(grep -A1 last_build_time ~/Library/Rime/user.yaml | tr -s ' \n' ' ')"
-          ls ~/Library/Rime/build
-          for s in wubi98_ci wubi98_dz wubi98_U py; do
-            test -f ~/Library/Rime/build/$s.schema.yaml
+          b=~/Library/Rime/build
+          ls "$b"
+          for f in default.yaml squirrel.yaml py.schema.yaml py.prism.bin py.table.bin \
+                   wb_spelling.prism.bin wb_spelling.table.bin; do
+            test -f "$b/$f" || { echo "error: 没有生成 build/$f" >&2; exit 1; }
           done
-          test -f ~/Library/Rime/build/squirrel.yaml
+          for s in wubi98_ci wubi98_dz wubi98_U; do
+            for f in $s.schema.yaml $s.extended.prism.bin $s.extended.table.bin; do
+              test -f "$b/$f" || { echo "error: 没有生成 build/$f" >&2; exit 1; }
+            done
+          done
+          check_errors
 
           # 鼠须管在运行时，install.sh 第 4 步应调用 Squirrel --reload
           mac/install.sh --yes | tee "$RUNNER_TEMP/reload.log"
           grep -q '已通知鼠须管重新部署' "$RUNNER_TEMP/reload.log"
           sleep 10
+          check_errors
           quit
+          # 鼠须管的 stdout 写文件时有缓冲，退出后才写全
           cat "$logs/squirrel.out"
-          # 退出后日志写全了
-          done_line=$(grep -hs 'finished updating schemas' "$log" | tail -1 || true)
-          echo "${done_line:-error: 日志里没有 finished updating schemas}"
-          echo "$done_line" | grep -q ', 0 failure'
-          grep -hs 'Reloading rime on demand' "$logs/squirrel.out" "$log"
-          errors=$(grep -hsE '^[EF][0-9]' "$tmp"/rime.squirrel.*.log || true)
-          if [ -n "$errors" ] || [ -e "$tmp/rime.squirrel.ERROR" ]; then
-            echo "error: 鼠须管日志里有 E/F 级：" >&2
-            echo "$errors" >&2
-            exit 1
-          fi
-          echo "鼠须管部署完成（0 failure），--reload 已收到，日志 E/F 级 0 行"
+          grep -q 'Reloading rime on demand' "$logs/squirrel.out"
+          echo "鼠须管部署完成，--reload 已收到"
 
       - name: 准备 rime-test（librime 1.16.0 发布包，编译驱动）
         run: |
