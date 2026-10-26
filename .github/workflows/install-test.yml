@@ -52,6 +52,28 @@ jobs:
           ls -la "${TMPDIR:-/tmp}"/rime.squirrel* 2>/dev/null || echo "没有 rime.squirrel 日志"
           defaults read com.apple.HIToolbox AppleEnabledInputSources || true
 
+      - name: 试着直接启动鼠须管部署（只记录，不判定）
+        continue-on-error: true
+        run: |
+          sq="/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel"
+          "$sq" > "$RUNNER_TEMP/squirrel.out" 2>&1 &
+          pid=$!
+          for i in $(seq 1 45); do
+            [ -f ~/Library/Rime/build/wubi98_ci.schema.yaml ] && break
+            sleep 2
+          done
+          sleep 5
+          pgrep -lx Squirrel || echo "鼠须管已退出"
+          ls ~/Library/Rime/build 2>/dev/null || echo "~/Library/Rime/build 不存在"
+          cat "$RUNNER_TEMP/squirrel.out"
+          for d in "${TMPDIR:-/tmp}" /tmp; do
+            ls -la "$d"/rime.squirrel* 2>/dev/null || true
+            grep -hE '^[EF][0-9]' "$d"/rime.squirrel.*.log 2>/dev/null | head -20 || true
+          done
+          "$sq" --quit || true
+          kill $pid 2>/dev/null || true
+          rm -rf ~/Library/Rime/build
+
       - name: 准备 rime-test（librime 1.16.0 发布包，编译驱动）
         run: |
           rime-test/tools/fetch_librime.sh
@@ -77,16 +99,21 @@ jobs:
 
   linux:
     runs-on: ubuntu-24.04-arm
+    # 在 Debian 13 容器里跑，与测试虚拟机相同。Ubuntu 24.04 自带的 librime-plugin-lua
+    # （git20230917）没有 KeyEvent(keycode, modifier) 构造，dvorak_remap.lua 在那里不能用
+    # （会话日志 "parse error: unrecognized key '47'"），见 README“Linux”一节。
+    container: debian:trixie
     steps:
-      - uses: actions/checkout@v5
-
       - name: 安装软件包
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          apt-get update
+          apt-get install -y --no-install-recommends \
             ibus-rime librime-plugin-lua librime-bin libopencc-data rsync \
-            g++ pkgconf librime-dev libxkbcommon-dev
-          dpkg-query -W ibus-rime librime-plugin-lua librime-bin libopencc-data 'librime[0-9]*' 'rime-data*' || true
+            g++ pkgconf librime-dev libxkbcommon-dev \
+            git ca-certificates curl xz-utils perl
+          dpkg-query -W ibus-rime librime-plugin-lua librime-bin libopencc-data 'librime1*' librime-data || true
+
+      - uses: actions/checkout@v5
 
       - name: 同步配置、装字体（linux/deploy.sh --local）
         run: linux/deploy.sh --local
