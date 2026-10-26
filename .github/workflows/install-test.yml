@@ -1,4 +1,8 @@
 # 在全新的 macOS 和 Linux runner 上从零跑一遍安装，检查装好的结果，再跑 rime-test。
+# 安装走 README 的一行命令：不 checkout，curl 下载本次提交的 install.sh，由它克隆仓库到
+# ~/.local/share/wubi98-dvorak 再调用平台脚本；后面的检查都在这份克隆里跑。
+# raw.githubusercontent.com 按分支名取会有几分钟缓存，所以 install.sh 按提交 SHA 取；
+# 克隆按分支名，取完核对 HEAD 就是本次提交（分支在这期间又被推送时这一步会失败，重跑即可）。
 # 做不了的：实际打字（没有人按键，也没有前台 App 接收输入）、在系统设置里添加输入源、
 # 候选框显示。macOS 上鼠须管不会被系统拉起，见“鼠须管自己部署”一步的说明。
 name: 安装测试
@@ -13,14 +17,27 @@ defaults:
   run:
     shell: bash  # bash -eo pipefail
 
+env:
+  BOOT_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+  BOOT_BRANCH: ${{ github.head_ref || github.ref_name }}
+  BOOT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   macos:
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v5
+      - name: 一行命令安装（install.sh → mac/install.sh --yes：鼠须管 1.1.2、字体、同步配置）
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/$BOOT_REPO/$BOOT_SHA/install.sh" |
+            WUBI98_DVORAK_REPO=https://github.com/$BOOT_REPO.git bash -s -- --branch "$BOOT_BRANCH" --yes
 
-      - name: 安装（mac/install.sh --yes：鼠须管 1.1.2、字体、同步配置）
-        run: mac/install.sh --yes
+      - name: 核对克隆的是本次提交
+        run: |
+          repo=$HOME/.local/share/wubi98-dvorak
+          head=$(git -C "$repo" rev-parse HEAD)
+          echo "${repo}：${BOOT_BRANCH} 分支 $head"
+          test "$head" = "$BOOT_SHA"
+          echo "REPO=$repo" >> "$GITHUB_ENV"
 
       - name: 检查鼠须管版本
         run: |
@@ -30,17 +47,22 @@ jobs:
           test "$v" = 1.1.2
 
       - name: 检查字体
+        working-directory: ${{ env.REPO }}
         run: sh fonts/install-fonts.sh --check
 
       - name: 检查 ~/Library/Rime 与 Rime/ 一致
+        working-directory: ${{ env.REPO }}
         run: |
           diff -r -x build -x sync -x trash -x '*.userdb' -x user.yaml \
             -x installation.yaml -x wubi98_ci.txt Rime ~/Library/Rime
           echo "一致"
 
-      - name: 重复运行安装（应全部跳过，不建备份目录）
+      - name: 重复运行一行命令（仓库 git pull 更新，安装全部跳过，不建备份目录）
         run: |
-          mac/install.sh --yes | tee "$RUNNER_TEMP/rerun.log"
+          curl -fsSL "https://raw.githubusercontent.com/$BOOT_REPO/$BOOT_SHA/install.sh" |
+            bash -s -- --branch "$BOOT_BRANCH" --yes | tee "$RUNNER_TEMP/rerun.log"
+          grep -q 'Already up to date' "$RUNNER_TEMP/rerun.log"
+          test "$(git -C "$REPO" rev-parse HEAD)" = "$BOOT_SHA"
           grep -q '已装鼠须管 1.1.2，跳过' "$RUNNER_TEMP/rerun.log"
           grep -q '98WB 字体已装好' "$RUNNER_TEMP/rerun.log"
           if ls -d ~/Library/Rime.backup-* 2>/dev/null; then
@@ -61,6 +83,7 @@ jobs:
       #   3. 所有日志：找得到，没有 ERROR 文件、没有 E/F 级，每次部署都是 0 failure。
       - name: 鼠须管自己部署（直接启动、--reload、更新后重启）
         timeout-minutes: 10
+        working-directory: ${{ env.REPO }}
         run: |
           sq="/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel"
           logdir=${TMPDIR:-/tmp}/rime.squirrel
@@ -173,16 +196,19 @@ jobs:
           echo "鼠须管日志：E/F 级 0 行，$(echo "$finished" | wc -l | xargs) 次部署都是 0 failure"
 
       - name: 准备 rime-test（librime 1.16.0 发布包，编译驱动）
+        working-directory: ${{ env.REPO }}
         run: |
           rime-test/tools/fetch_librime.sh
           rime-test/tools/build.sh
 
       - name: 部署（rime_deployer）并确认 Lua 插件能加载
+        working-directory: ${{ env.REPO }}
         env:
           TMPDIR: ${{ runner.temp }}
         run: rime-test/tools/check_install.sh ~/Library/Rime "/Library/Input Methods/Squirrel.app/Contents/SharedSupport"
 
       - name: rime-test（check_dv.sh）
+        working-directory: ${{ env.REPO }}
         run: rime-test/tools/check_dv.sh
 
       - name: 上传日志
@@ -191,7 +217,7 @@ jobs:
         with:
           name: logs-macos
           path: |
-            rime-test/logs/
+            ${{ env.REPO }}/rime-test/logs/
             ${{ runner.temp }}/check_install.*
             ${{ runner.temp }}/squirrel-logs/
           if-no-files-found: ignore
@@ -203,6 +229,22 @@ jobs:
     # （会话日志 "parse error: unrecognized key '47'"），见 README“Linux”一节。
     container: debian:trixie
     steps:
+      # 先只装 curl：引导脚本发现没有 git、rsync 时应打印完整的 apt 命令，不自己执行
+      - name: 没有 git 时的提示
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends curl ca-certificates
+          log=$RUNNER_TEMP/nogit.log
+          if curl -fsSL "https://raw.githubusercontent.com/$BOOT_REPO/$BOOT_SHA/install.sh" | bash > "$log" 2>&1; then
+            cat "$log"
+            echo "error: 没有 git 时引导脚本应该失败" >&2
+            exit 1
+          fi
+          cat "$log"
+          grep -q '缺少 git rsync' "$log"
+          grep -qF 'sudo apt install --no-install-recommends ibus-rime librime-plugin-lua librime-bin libopencc-data rsync fonts-noto-cjk git' "$log"
+          test ! -e ~/.local/share/wubi98-dvorak
+
       - name: 安装软件包
         run: |
           apt-get update
@@ -212,15 +254,25 @@ jobs:
             git ca-certificates curl xz-utils perl
           dpkg-query -W ibus-rime librime-plugin-lua librime-bin libopencc-data 'librime1*' librime-data || true
 
-      - uses: actions/checkout@v5
+      - name: 一行命令安装（install.sh → linux/deploy.sh --local：同步配置、装字体）
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/$BOOT_REPO/$BOOT_SHA/install.sh" |
+            WUBI98_DVORAK_REPO=https://github.com/$BOOT_REPO.git bash -s -- --branch "$BOOT_BRANCH"
 
-      - name: 同步配置、装字体（linux/deploy.sh --local）
-        run: linux/deploy.sh --local
+      - name: 核对克隆的是本次提交
+        run: |
+          repo=$HOME/.local/share/wubi98-dvorak
+          head=$(git -C "$repo" rev-parse HEAD)
+          echo "${repo}：${BOOT_BRANCH} 分支 $head"
+          test "$head" = "$BOOT_SHA"
+          echo "REPO=$repo" >> "$GITHUB_ENV"
 
       - name: 检查字体
+        working-directory: ${{ env.REPO }}
         run: sh fonts/install-fonts.sh --check
 
       - name: 检查 ~/.config/ibus/rime 与 Rime/ 一致
+        working-directory: ${{ env.REPO }}
         run: |
           d=~/.config/ibus/rime
           diff -r -x build -x sync -x trash -x '*.userdb' -x user.yaml \
@@ -232,6 +284,7 @@ jobs:
           echo "一致"
 
       - name: 部署（rime_deployer）并确认 Lua 插件能加载
+        working-directory: ${{ env.REPO }}
         env:
           TMPDIR: ${{ runner.temp }}
         run: |
@@ -239,6 +292,7 @@ jobs:
           rime-test/tools/check_install.sh ~/.config/ibus/rime /usr/share/rime-data
 
       - name: rime-test（系统共享数据，check_dv.sh）
+        working-directory: ${{ env.REPO }}
         env:
           RIME_TEST_SHARED: /usr/share/rime-data
         run: rime-test/tools/check_dv.sh
@@ -249,6 +303,6 @@ jobs:
         with:
           name: logs-linux
           path: |
-            rime-test/logs/
+            ${{ env.REPO }}/rime-test/logs/
             ${{ runner.temp }}/check_install.*
           if-no-files-found: ignore

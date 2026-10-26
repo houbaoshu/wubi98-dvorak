@@ -7,29 +7,48 @@
 
 ## 安装
 
-### Mac
-
 ```sh
-git clone https://github.com/houbaoshu/wubi98-dvorak.git
-cd wubi98-dvorak
-mac/install.sh
+curl -fsSL https://raw.githubusercontent.com/houbaoshu/wubi98-dvorak/main/install.sh | bash
 ```
 
-脚本会装鼠须管 1.1.2（要管理员密码时打印命令，等你装好按回车）、装字体、同步配置并重新部署。装完：
+把仓库克隆到 `~/.local/share/wubi98-dvorak`（已有就 `git pull --ff-only` 更新），再按系统运行
+`mac/install.sh` 或 `linux/deploy.sh --local`。以后更新也是重新运行这一行。
+
+### Mac
+
+脚本会装鼠须管 1.1.2（要管理员密码时打印命令，等你装好按回车）、装字体、同步配置并重新部署。
+没有 git 时会提示先运行 `xcode-select --install`。装完：
 
 - 系统设置 → 键盘 → 文字输入 → 输入法“编辑…”，在简体中文下添加“鼠须管”（找不到就注销重新登录）。
 - 键盘布局保持“Dvorak”（英语）。
 
 ### Linux（Debian 13）
 
+先装软件包（脚本不代为执行 sudo；缺 git、rsync 时会打印这条命令），再运行上面那一行：
+
 ```sh
 sudo apt install --no-install-recommends ibus-rime librime-plugin-lua librime-bin libopencc-data rsync fonts-noto-cjk git
-git clone https://github.com/houbaoshu/wubi98-dvorak.git
-cd wubi98-dvorak
-linux/deploy.sh --local
 ```
 
 然后在 设置 → 键盘 → 输入源 里依次放“英语（Dvorak）”和“中文（Rime）”，注销重新登录一次（候选框字体才生效）。
+
+### 选项和备用方式
+
+`bash -s --` 后面加参数：`--dir DIR` 换克隆位置，`--branch BRANCH` 用别的分支（测试用，默认 `main`）；
+也可以用环境变量 `WUBI98_DVORAK_DIR`、`WUBI98_DVORAK_BRANCH`。其余参数在 Mac 上传给 `mac/install.sh`。
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/houbaoshu/wubi98-dvorak/main/install.sh | bash -s -- --branch BRANCH
+```
+
+不想用 curl 管道，就自己克隆后运行平台脚本：
+
+```sh
+git clone https://github.com/houbaoshu/wubi98-dvorak.git
+cd wubi98-dvorak
+mac/install.sh            # Mac
+linux/deploy.sh --local   # Linux，先装好上面的软件包
+```
 
 ## 用法
 
@@ -127,7 +146,8 @@ rime-test/tools/run_case.sh rime-test/user-dv rime-test/cases/01_four_code.keys 
 ## CI
 
 `.github/workflows/install-test.yml` 在全新的 macOS（`macos-26`）和 Debian 13 容器里从零跑安装
-（`mac/install.sh --yes`、`linux/deploy.sh --local`），核对版本、字体、配置、部署日志和 Lua 加载，最后跑 `check_dv.sh`。
+（不 checkout，用 README 那一行 curl 命令：`install.sh` 克隆仓库后调用 `mac/install.sh --yes`、`linux/deploy.sh --local`；
+Linux 上还先在没有 git 时跑一次，确认打印 apt 命令），核对版本、字体、配置、部署日志和 Lua 加载，最后跑 `check_dv.sh`。
 没验证实际打字、候选框显示和在系统设置里添加输入源。
 
 ## 来源说明
