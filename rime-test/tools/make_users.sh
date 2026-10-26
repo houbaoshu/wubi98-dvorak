@@ -4,11 +4,13 @@
 #   user-base = Rime/ 去掉 dvorak_remap 的挂载行，作为基线。
 # 步骤：
 #   1. 核对 Rime/lua/dvorak_remap.lua 里的映射表和 tools/dvorak_map.tsv
-#      与系统布局实测一致；
+#      与系统布局实测一致（macOS 测苹果布局，Linux 测 XKB 布局，见 build.sh）；
 #   2. 复制 Rime/（不含部署产物、运行时状态和用户词典 wubi98_ci.txt，
 #      让结果不依赖本机输入历史）；
 #   3. user-base 从 wubi98_ci、wubi98_dz、wubi98_U 三个方案的 custom 里删掉挂载行；
 #   4. 部署。
+# 共享数据目录默认是 shared/；设了环境变量 RIME_TEST_SHARED 时用它
+# （如 Linux 上的 /usr/share/rime-data），run_case.sh 也认这个变量。
 # 需要先运行 tools/build.sh。
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -48,7 +50,7 @@ for name in base dv; do
     done
   fi
 
-  if ! "$here/bin/rime_dvtest" --shared "$here/shared" --user "$dst" \
+  if ! "$here/bin/rime_dvtest" --shared "${RIME_TEST_SHARED:-$here/shared}" --user "$dst" \
        --deploy-only 2> "$here/logs/deploy-user-$name.log"; then
     echo "error: user-$name 部署失败，见 logs/deploy-user-$name.log" >&2
     exit 1
