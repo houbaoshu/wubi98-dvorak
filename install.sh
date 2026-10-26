@@ -44,7 +44,7 @@ EOF
       [ -z "$missing" ] && return 0
       cat >&2 <<EOF
 error: 缺少${missing}。请先手动执行（Debian 13，同 README 的安装步骤；其他发行版装对应的包）：
-  sudo apt install --no-install-recommends ibus-rime librime-plugin-lua librime-bin libopencc-data rsync fonts-noto-cjk git
+  sudo apt install --no-install-recommends ibus-rime librime-plugin-lua librime-bin libopencc-data rsync fonts-noto-cjk git curl
 装好后重新运行这条安装命令。
 EOF
       exit 1 ;;

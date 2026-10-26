@@ -242,7 +242,7 @@ jobs:
           fi
           cat "$log"
           grep -q '缺少 git rsync' "$log"
-          grep -qF 'sudo apt install --no-install-recommends ibus-rime librime-plugin-lua librime-bin libopencc-data rsync fonts-noto-cjk git' "$log"
+          grep -qF 'sudo apt install --no-install-recommends ibus-rime librime-plugin-lua librime-bin libopencc-data rsync fonts-noto-cjk git curl' "$log"
           test ! -e ~/.local/share/wubi98-dvorak
 
       - name: 安装软件包

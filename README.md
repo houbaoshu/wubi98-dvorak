@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/houbaoshu/wubi98-dvorak/main/instal
 先装软件包（脚本不代为执行 sudo；缺 git、rsync 时会打印这条命令），再运行上面那一行：
 
 ```sh
-sudo apt install --no-install-recommends ibus-rime librime-plugin-lua librime-bin libopencc-data rsync fonts-noto-cjk git
+sudo apt install --no-install-recommends ibus-rime librime-plugin-lua librime-bin libopencc-data rsync fonts-noto-cjk git curl
 ```
 
 然后在 设置 → 键盘 → 输入源 里依次放“英语（Dvorak）”和“中文（Rime）”，注销重新登录一次（候选框字体才生效）。
