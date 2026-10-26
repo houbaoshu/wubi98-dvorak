@@ -132,7 +132,8 @@ run_case.sh 在临时克隆里跑，不改 `user-dv`；直接调用 `rime-test/b
 
 在 Debian 13 arm64 + GNOME 48（Wayland）+ ibus-rime 1.5.1 / librime 1.13.1 上跑通。
 `Rime/` 是两边共用的配置；`squirrel.custom.yaml` 只用于 Mac，同步到 Linux 时排除；
-Linux 专属的放在 `linux/`：`ibus_rime.custom.yaml`（候选竖排、编码不嵌入）和 `deploy.sh`。
+Linux 专属的放在 `linux/`：`ibus_rime.custom.yaml`（候选竖排、编码不嵌入）、
+`fontconfig/`（候选框字体回退）和 `deploy.sh`。
 
 1. 安装：
 
@@ -149,20 +150,29 @@ Linux 专属的放在 `linux/`：`ibus_rime.custom.yaml`（候选竖排、编码
    ```
 
    切到 Rime 时 ibus-rime 自动部署，日志在 `/tmp/rime.ibus.*`。
+   脚本同时把本机 `~/Library/Fonts/98WB-*.otf` 复制到 `~/.local/share/fonts/98WB/`，
+   把 `linux/fontconfig/` 装到 `~/.config/fontconfig/conf.d/`，再 `fc-cache -f`。
 
 3. 输入源：设置 → 键盘 → 输入源，依次是“英语（Dvorak）”和“中文（Rime）”。
    Rime 引擎的布局是 `default`，GNOME 会沿用前一个 XKB 布局，所以 Rime 收到的是德沃夏克字符，
    和 Mac 上 `keyboard_layout: Dvorak` 一样，`dvorak_remap.lua` 不用改。
 
-4. 字体：把 `98WB-*.otf` 复制到 `~/.local/share/fonts/`，运行 `fc-cache -f`。
-   候选框的字体由 GNOME 主题决定，拆分字根（私用区字符）靠 fontconfig 回退到 98WB。
-   系统里没有别的中文字体时，98WB-1 会成为默认中文字体，最好再装 `fonts-noto-cjk`。
+4. 字体：GNOME 的候选框由 gnome-shell 画，字体是 Shell 主题的 Cantarell，
+   拆分字根和超集生僻字都靠 fontconfig 回退。gnome-shell 只在启动时读字体列表，
+   **装了字体或改了 fontconfig 配置要注销重新登录**，否则候选框里还是方块。
+   默认的回退顺序里 98WB 排得很后，BMP 私用区的字根（只有 98WB-V 有）会被 OpenSymbol
+   画成不相干的符号；`linux/fontconfig/60-98wb-ibus-candidates.conf` 只对 gnome-shell 进程
+   把 Noto Sans CJK SC、98WB-0（拆分字根，同 Mac 上 wubi98_ci 的注释字体）、98WB-V、98WB-U
+   排到前面，其他程序不受影响。再装 `fonts-noto-cjk`，否则 98WB-1 会成为系统默认中文字体。
 
 与 Mac 的差异：
 
 - 不能按 App 设默认英文：ibus-rime 不把 App 信息传给 librime（没有 `client_app`），`app_options` 不生效。
 - Debian 的 rime-prelude（`default.yaml` 0.40）把 Tab 绑成按词移动光标；鼠须管带的 0.50 是 Tab 选下一个候选。
 - z 反查的候选注释在 Linux 上是“〔拆分 · 编码〕”，Mac 上只有编码（两边都与德沃夏克无关，原因未查）。
+- 候选框字体不能按方案设：超集方案的拆分字根也用 98WB-0（Mac 上是 98WB-3），生僻字用 98WB-U/V。
+- 切换开关（`Ctrl+Shift+F` 等）时 ibus-rime 不弹提示，只能从候选看出简繁；连按两次等于没切。
+- 这几个快捷键会被 Rime 吃掉，App 自己的同名快捷键（如终端的 `Ctrl+Shift+F` 查找）用不了，Mac 上也一样。
 
 ## 来源说明
 
