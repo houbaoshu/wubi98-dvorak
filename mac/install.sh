@@ -2,14 +2,16 @@
 # 在一台 Mac 上从零装好这套输入法：鼠须管 1.1.2、98WB 字体，把 Rime/ 同步到
 # ~/Library/Rime，再让鼠须管重新部署。可以重复运行，已装好的部分跳过。
 #
-# 用法（在仓库根目录）: mac/install.sh [--target DIR] [--font-dir DIR]
+# 用法（在仓库根目录）: mac/install.sh [--yes] [--target DIR] [--font-dir DIR]
+#   --yes           需要装鼠须管时不等回车，直接运行 sudo installer（sudo 照常问密码）。
+#                   用于 CI，那里 sudo 不要密码；平时不加。
 #   --target DIR    同步到 DIR，默认 ~/Library/Rime。不是默认目录时不触发重新部署
 #                   （鼠须管只部署 ~/Library/Rime），用来在临时目录里试同步和备份。
 #   --font-dir DIR  字体装到 DIR，默认 ~/Library/Fonts。
 #
 # 1. 鼠须管：没装时下载官方 1.1.2 安装包（固定版本，不装最新版），按记录的 SHA-256
 #    校验，缓存在 ~/Library/Caches/wubi98-dvorak/，已下载且校验相同就不再下载。
-#    安装要管理员密码，脚本不代为执行，只打印命令，等你装好后继续。
+#    安装要管理员密码，默认脚本不代为执行，只打印命令，等你装好后继续；加 --yes 时直接运行。
 #    已装了别的版本时只提示，不替换。环境变量 SQUIRREL_APP 可以换掉检查的路径，仅供测试。
 # 2. 字体：fonts/install-fonts.sh（与 Linux 共用）。
 # 3. 同步：排除项与 README 里手动部署的命令相同，部署产物、用户词典和运行时状态都不覆盖。
@@ -21,17 +23,19 @@
 set -eu
 
 usage() {
-  echo "usage: mac/install.sh [--target DIR] [--font-dir DIR]" >&2
+  echo "usage: mac/install.sh [--yes] [--target DIR] [--font-dir DIR]" >&2
   exit 2
 }
 
 default_target=$HOME/Library/Rime
 target=$default_target
 font_dir=$HOME/Library/Fonts
+yes=0
 while [ $# -gt 0 ]; do
   case $1 in
     --target) [ $# -ge 2 ] || usage; target=$2; shift 2 ;;
     --font-dir) [ $# -ge 2 ] || usage; font_dir=$2; shift 2 ;;
+    --yes) yes=1; shift ;;
     *) usage ;;
   esac
 done
@@ -82,15 +86,20 @@ else
     echo "已下载并校验：$pkg"
   fi
   echo
-  echo "安装鼠须管需要管理员密码，请你手动完成（任选一种）："
-  echo "  sudo installer -pkg '$pkg' -target /"
-  echo "  open '$pkg'        # 图形安装器"
-  if [ -t 0 ]; then
-    printf '装好后按回车继续（也可以 Ctrl+C 退出，装好后重新运行本脚本）'
-    read -r _
+  if [ "$yes" = 1 ]; then
+    echo "运行 sudo installer -pkg '$pkg' -target /"
+    sudo installer -pkg "$pkg" -target /
   else
-    echo "装好后重新运行本脚本。"
-    exit 1
+    echo "安装鼠须管需要管理员密码，请你手动完成（任选一种）："
+    echo "  sudo installer -pkg '$pkg' -target /"
+    echo "  open '$pkg'        # 图形安装器"
+    if [ -t 0 ]; then
+      printf '装好后按回车继续（也可以 Ctrl+C 退出，装好后重新运行本脚本）'
+      read -r _
+    else
+      echo "装好后重新运行本脚本。"
+      exit 1
+    fi
   fi
   if ! v=$(installed_version); then
     echo "error: 还是没找到 ${squirrel_app}，装好后重新运行本脚本" >&2

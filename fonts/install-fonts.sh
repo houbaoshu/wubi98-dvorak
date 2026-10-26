@@ -2,7 +2,8 @@
 # 安装 98WB 字体（Mac 和 Linux 共用）：从 98 五笔小组（yanhuacuo）的原仓库下载，
 # 校验后装到字体目录。本仓库不包含字体文件。
 #
-# 用法: sh fonts/install-fonts.sh [字体目录]
+# 用法: sh fonts/install-fonts.sh [--check] [字体目录]
+#   --check：只检查字体目录里六个字体都在且校验相同，不下载、不安装；不符时退出码 1（CI 用）。
 #   默认字体目录：macOS 是 ~/Library/Fonts，Linux 是 ~/.local/share/fonts/98WB。
 #   mac/install.sh 在本机调用它；linux/deploy.sh 在 Mac 上通过 ssh 让 Linux 远程执行它。
 #
@@ -14,6 +15,11 @@
 # 六个字体都已装好且校验相同时不再下载。
 # Linux 上最后运行 fc-cache -f；macOS 不需要。
 set -eu
+check_only=0
+if [ "${1:-}" = --check ]; then
+  check_only=1
+  shift
+fi
 url=https://github.com/yanhuacuo/98wubi-unicode/releases/download/v1.0.0/Ubuntu-22.04-LTS.tar.xz
 case $(uname -s) in
   Darwin) os=mac; dest=${1:-$HOME/Library/Fonts} ;;
@@ -39,6 +45,11 @@ check() {  # check DIR：DIR 里六个字体都在且校验相同
 
 if check "$dest"; then
   echo "98WB 字体已装好（${dest}，校验相同），不再下载"
+  [ "$check_only" = 0 ] || exit 0
+elif [ "$check_only" = 1 ]; then
+  echo "error: $dest 里的 98WB 字体不全或与记录的 SHA-256 不符" >&2
+  (cd "$dest" 2>/dev/null && echo "$sums" | sha256 --check -) >&2 || true
+  exit 1
 else
   tmp=$(mktemp -d)
   trap 'rm -rf "$tmp"' EXIT

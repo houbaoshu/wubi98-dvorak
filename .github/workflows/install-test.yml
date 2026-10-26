@@ -1,0 +1,128 @@
+# 在全新的 macOS 和 Linux runner 上从零跑一遍安装，检查装好的结果，再跑 rime-test。
+# 做不了的：实际打字（没有人按键，也没有前台 App 接收输入）、在系统设置里添加输入源；
+# macOS 上鼠须管自己的部署见 macos 任务里“部署”一步的说明。
+name: 安装测试
+
+on:
+  push:
+    branches: [main, mac-install]  # 临时：mac-install 分支调试 CI 用，合并前删掉 mac-install
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 安装（mac/install.sh --yes：鼠须管 1.1.2、字体、同步配置）
+        run: mac/install.sh --yes
+
+      - name: 检查鼠须管版本
+        run: |
+          app="/Library/Input Methods/Squirrel.app"
+          v=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")
+          echo "鼠须管 $v"
+          test "$v" = 1.1.2
+
+      - name: 检查字体
+        run: sh fonts/install-fonts.sh --check
+
+      - name: 检查 ~/Library/Rime 与 Rime/ 一致
+        run: |
+          diff -r -x build -x sync -x trash -x '*.userdb' -x user.yaml \
+            -x installation.yaml -x wubi98_ci.txt Rime ~/Library/Rime
+          echo "一致"
+
+      - name: 重复运行安装（应全部跳过，不建备份目录）
+        run: |
+          mac/install.sh --yes | tee "$RUNNER_TEMP/rerun.log"
+          grep -q '已装鼠须管 1.1.2，跳过' "$RUNNER_TEMP/rerun.log"
+          grep -q '98WB 字体已装好' "$RUNNER_TEMP/rerun.log"
+          if ls -d ~/Library/Rime.backup-* 2>/dev/null; then
+            echo "error: 重复运行建了备份目录" >&2
+            exit 1
+          fi
+
+      - name: 鼠须管运行状态（只记录，不判定）
+        run: |
+          pgrep -lx Squirrel || echo "鼠须管没在运行"
+          ls -la ~/Library/Rime
+          ls ~/Library/Rime/build 2>/dev/null || echo "~/Library/Rime/build 不存在"
+          ls -la "${TMPDIR:-/tmp}"/rime.squirrel* 2>/dev/null || echo "没有 rime.squirrel 日志"
+          defaults read com.apple.HIToolbox AppleEnabledInputSources || true
+
+      - name: 准备 rime-test（librime 1.16.0 发布包，编译驱动）
+        run: |
+          rime-test/tools/fetch_librime.sh
+          rime-test/tools/build.sh
+
+      - name: 部署（rime_deployer）并确认 Lua 插件能加载
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: rime-test/tools/check_install.sh ~/Library/Rime "/Library/Input Methods/Squirrel.app/Contents/SharedSupport"
+
+      - name: rime-test（check_dv.sh）
+        run: rime-test/tools/check_dv.sh
+
+      - name: 上传日志
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: logs-macos
+          path: |
+            rime-test/logs/
+            ${{ runner.temp }}/check_install.*
+          if-no-files-found: ignore
+
+  linux:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 安装软件包
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ibus-rime librime-plugin-lua librime-bin libopencc-data rsync \
+            g++ pkgconf librime-dev libxkbcommon-dev
+          dpkg-query -W ibus-rime librime-plugin-lua librime-bin libopencc-data 'librime[0-9]*' 'rime-data*' || true
+
+      - name: 同步配置、装字体（linux/deploy.sh --local）
+        run: linux/deploy.sh --local
+
+      - name: 检查字体
+        run: sh fonts/install-fonts.sh --check
+
+      - name: 检查 ~/.config/ibus/rime 与 Rime/ 一致
+        run: |
+          d=~/.config/ibus/rime
+          diff -r -x build -x sync -x trash -x '*.userdb' -x user.yaml \
+            -x installation.yaml -x wubi98_ci.txt \
+            -x squirrel.custom.yaml -x ibus_rime.custom.yaml Rime "$d"
+          cmp linux/ibus_rime.custom.yaml "$d/ibus_rime.custom.yaml"
+          test ! -e "$d/squirrel.custom.yaml"
+          diff -r linux/fontconfig ~/.config/fontconfig/conf.d
+          echo "一致"
+
+      - name: 部署（rime_deployer）并确认 Lua 插件能加载
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          rime-test/tools/build.sh
+          rime-test/tools/check_install.sh ~/.config/ibus/rime /usr/share/rime-data
+
+      - name: rime-test（系统共享数据，check_dv.sh）
+        env:
+          RIME_TEST_SHARED: /usr/share/rime-data
+        run: rime-test/tools/check_dv.sh
+
+      - name: 上传日志
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: logs-linux
+          path: |
+            rime-test/logs/
+            ${{ runner.temp }}/check_install.*
+          if-no-files-found: ignore
