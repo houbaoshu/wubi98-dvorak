@@ -23,7 +23,7 @@ mac/install.sh
 ### Linux（Debian 13）
 
 ```sh
-sudo apt install --no-install-recommends ibus-rime librime-plugin-lua librime-bin libopencc-data rsync fonts-noto-cjk
+sudo apt install --no-install-recommends ibus-rime librime-plugin-lua librime-bin libopencc-data rsync fonts-noto-cjk git
 git clone https://github.com/houbaoshu/wubi98-dvorak.git
 cd wubi98-dvorak
 linux/deploy.sh --local
