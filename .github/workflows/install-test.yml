@@ -1,6 +1,6 @@
 # 在全新的 macOS 和 Linux runner 上从零跑一遍安装，检查装好的结果，再跑 rime-test。
-# 做不了的：实际打字（没有人按键，也没有前台 App 接收输入）、在系统设置里添加输入源；
-# macOS 上鼠须管自己的部署见 macos 任务里“部署”一步的说明。
+# 做不了的：实际打字（没有人按键，也没有前台 App 接收输入）、在系统设置里添加输入源、
+# 候选框显示。macOS 上鼠须管不会被系统拉起，见“鼠须管部署”一步的说明。
 name: 安装测试
 
 on:
@@ -8,6 +8,10 @@ on:
     branches: [main, mac-install]  # 临时：mac-install 分支调试 CI 用，合并前删掉 mac-install
   pull_request:
   workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash  # bash -eo pipefail
 
 jobs:
   macos:
@@ -44,34 +48,57 @@ jobs:
             exit 1
           fi
 
-      - name: 鼠须管运行状态（只记录，不判定）
-        run: |
-          pgrep -lx Squirrel || echo "鼠须管没在运行"
-          ls -la ~/Library/Rime
-          ls ~/Library/Rime/build 2>/dev/null || echo "~/Library/Rime/build 不存在"
-          ls -la "${TMPDIR:-/tmp}"/rime.squirrel* 2>/dev/null || echo "没有 rime.squirrel 日志"
-          defaults read com.apple.HIToolbox AppleEnabledInputSources || true
-
-      - name: 试着直接启动鼠须管部署（只记录，不判定）
-        continue-on-error: true
+      # 安装包装完提示要注销重新登录，鼠须管没有被系统拉起，输入源里也还没有它，
+      # 所以 install.sh 第 4 步走的是“没在运行”。这里直接启动鼠须管（代替系统在切到
+      # 输入法时拉起它），它启动时用自己的 librime 和 Lua 插件部署 ~/Library/Rime，
+      # 日志在 $TMPDIR/rime.squirrel.*。
+      - name: 鼠须管部署（启动鼠须管，再经 install.sh 触发 --reload）
         run: |
           sq="/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel"
-          "$sq" > "$RUNNER_TEMP/squirrel.out" 2>&1 &
+          log="${TMPDIR:-/tmp}/rime.squirrel.INFO"
+          logs=$RUNNER_TEMP/squirrel-logs
+          mkdir -p "$logs"
+          "$sq" > "$logs/squirrel.out" 2>&1 &
           pid=$!
-          for i in $(seq 1 45); do
-            [ -f ~/Library/Rime/build/wubi98_ci.schema.yaml ] && break
+          trap '"$sq" --quit || true; kill $pid 2>/dev/null || true; cp -L "${TMPDIR:-/tmp}"/rime.squirrel.* "$logs/" 2>/dev/null || true' EXIT
+          # 部署结束时 librime 记一行 "finished updating schemas: N success, M failure."
+          for i in $(seq 1 90); do
+            grep -q 'finished updating schemas' "$log" 2>/dev/null && break
             sleep 2
           done
-          sleep 5
-          pgrep -lx Squirrel || echo "鼠须管已退出"
-          ls ~/Library/Rime/build 2>/dev/null || echo "~/Library/Rime/build 不存在"
-          cat "$RUNNER_TEMP/squirrel.out"
-          for d in "${TMPDIR:-/tmp}" /tmp; do
-            ls -la "$d"/rime.squirrel* 2>/dev/null || true
-            grep -hE '^[EF][0-9]' "$d"/rime.squirrel.*.log 2>/dev/null | head -20 || true
+          done_line=$(grep -h 'finished updating schemas' "$log" 2>/dev/null | tail -1)
+          echo "${done_line:-error: 3 分钟内没有部署完成}"
+          echo "$done_line" | grep -q ', 0 failure'
+          pgrep -lx Squirrel
+          ls ~/Library/Rime/build
+          for s in wubi98_ci wubi98_dz wubi98_U py; do
+            test -f ~/Library/Rime/build/$s.schema.yaml
           done
+          test -f ~/Library/Rime/build/squirrel.yaml
+
+          # 鼠须管在运行时，install.sh 第 4 步应调用 Squirrel --reload，鼠须管收到后记一行
+          mac/install.sh --yes | tee "$RUNNER_TEMP/reload.log"
+          grep -q '已通知鼠须管重新部署' "$RUNNER_TEMP/reload.log"
+          sleep 10
+          # 退出后再查：鼠须管的 stdout 写文件时有缓冲，退出时才刷出
           "$sq" --quit || true
-          kill $pid 2>/dev/null || true
+          for i in $(seq 1 15); do
+            kill -0 $pid 2>/dev/null || break
+            sleep 1
+          done
+          echo "--- squirrel stdout/stderr"
+          cat "$logs/squirrel.out"
+          echo "---"
+          grep -h 'Reloading rime on demand' "$logs/squirrel.out" "$log"
+
+          errors=$(grep -hE '^[EF][0-9]' "${TMPDIR:-/tmp}"/rime.squirrel.*.log || true)
+          if [ -n "$errors" ] || ls "${TMPDIR:-/tmp}"/rime.squirrel.ERROR 2>/dev/null; then
+            echo "error: 鼠须管日志里有 E/F 级：" >&2
+            echo "$errors" >&2
+            exit 1
+          fi
+          echo "鼠须管日志 E/F 级 0 行"
+          # 留给下一步的 rime_deployer 从头部署
           rm -rf ~/Library/Rime/build
 
       - name: 准备 rime-test（librime 1.16.0 发布包，编译驱动）
@@ -95,6 +122,7 @@ jobs:
           path: |
             rime-test/logs/
             ${{ runner.temp }}/check_install.*
+            ${{ runner.temp }}/squirrel-logs/
           if-no-files-found: ignore
 
   linux:
