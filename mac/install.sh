@@ -19,6 +19,10 @@
 #    被覆盖的旧文件挪到 <目标>.backup-<时间>（没有被覆盖的文件时不会建这个目录）。
 #    目标里旧版 98 五笔留下的、会让鼠须管崩溃或挡住新版的文件（见 README“来源说明”）
 #    也挪到同一个备份目录。没有 --delete，其他只在目标里有的文件不动。
+#    目标先解析成绝对路径，否则相对路径下 rsync 会把备份目录建在目标目录里面。
+#    最后 touch 目标目录：rsync -a 保留的是 Rime/ 里的修改时间，可能早于上次部署的
+#    var/last_build_time；鼠须管启动时检测改动只看修改时间，不 touch 就会跳过部署，
+#    继续用旧的编译结果（linux/deploy.sh 同理）。
 # 4. 重新部署：Squirrel --reload，与菜单里的“重新部署”相同。
 set -eu
 
@@ -111,9 +115,10 @@ fi
 echo "== 2/4 98WB 字体"
 sh "$repo/fonts/install-fonts.sh" "$font_dir"
 
+mkdir -p "$target"
+target=$(cd "$target" && pwd)
 echo "== 3/4 同步 Rime/ 到 $target"
 backup=$target.backup-$(date +%Y%m%d-%H%M%S)
-mkdir -p "$target"
 for f in $stale; do
   if [ -e "$target/$f" ]; then
     mkdir -p "$(dirname "$backup/$f")"
@@ -126,6 +131,7 @@ rsync -a --checksum --itemize-changes --backup --backup-dir="$backup" \
   --exclude='*.userdb/' --exclude=/user.yaml --exclude=/installation.yaml \
   --exclude=/wubi98_ci.txt \
   "$repo/Rime/" "$target/"
+touch "$target"
 if [ -d "$backup" ]; then
   echo "被覆盖或挪走的旧文件在 $backup"
 else
@@ -133,7 +139,7 @@ else
 fi
 
 echo "== 4/4 重新部署"
-if [ "$target" != "$default_target" ]; then
+if [ "$target" != "$(cd "$default_target" 2>/dev/null && pwd)" ]; then
   echo "目标不是 ${default_target}，不触发重新部署"
 elif pgrep -xq Squirrel; then
   "$squirrel_app/Contents/MacOS/Squirrel" --reload
