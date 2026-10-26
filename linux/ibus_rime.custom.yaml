@@ -1,0 +1,7 @@
+# ibus-rime 的界面设置，只用于 Linux（Mac 上对应的是 squirrel.custom.yaml）。
+# ibus-rime 不读方案里的 style/*，只读 ibus_rime.yaml 的 style 这几项；
+# 这里照 Mac 上默认方案 wubi98_ci 的样子：候选竖排，编码不嵌入正文。
+# 字体由桌面决定（GNOME 下是 Shell 主题），98WB 字体装好后靠 fontconfig 回退显示拆分字根。
+patch:
+  style/horizontal: false
+  style/inline_preedit: false

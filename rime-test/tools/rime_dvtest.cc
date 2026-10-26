@@ -22,8 +22,11 @@
 // 部署由本程序调用 start_maintenance(True) 完成；日志 (glog) 只写到 stderr，
 // 逐键结果写到 stdout。
 
+#ifdef __APPLE__
 #include <mach-o/dyld.h>
+#endif
 #include <rime_api.h>
+#include <unistd.h>
 
 #include <climits>
 #include <cstdio>
@@ -60,10 +63,19 @@ void Usage() {
 
 std::string DefaultDvorakMapPath() {
   char buf[PATH_MAX];
-  uint32_t size = sizeof(buf);
   char resolved[PATH_MAX];
+#ifdef __APPLE__
+  uint32_t size = sizeof(buf);
   if (_NSGetExecutablePath(buf, &size) != 0 || !realpath(buf, resolved))
     return "";
+#else
+  ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+  if (len < 0)
+    return "";
+  buf[len] = '\0';
+  if (!realpath(buf, resolved))
+    return "";
+#endif
   std::string exe = resolved;
   return exe.substr(0, exe.rfind('/')) + "/../tools/dvorak_map.tsv";
 }

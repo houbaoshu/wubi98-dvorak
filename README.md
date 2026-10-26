@@ -76,8 +76,10 @@
 
 ## 跑测试
 
-只能在 macOS 上跑（`UCKeyTranslate`；`run_case.sh` 的 `cp -c` 依赖 APFS）。
-用与鼠须管 1.1.2 同版本的 librime 1.16.0（a251145）发布包，带 librime-lua，不依赖系统里装的鼠须管。
+macOS 和 Linux 上都能跑。macOS 上用与鼠须管 1.1.2 同版本的 librime 1.16.0（a251145）发布包，
+带 librime-lua，不依赖系统里装的鼠须管；Linux 上用系统的 librime（见下面“Linux”一节）。
+
+macOS：
 
 1. 下载 [librime 1.16.0 发布页](https://github.com/rime/librime/releases/tag/1.16.0)
    的 `rime-a251145-macOS-universal.tar.bz2`，放到 `rime-test/vendor/dl/`，解压到 `rime-test/vendor/`：
@@ -95,6 +97,12 @@
    ```sh
    rime-test/tools/check_dv.sh
    ```
+
+Linux（Debian 13 实测）：装好 `g++ pkgconf librime-dev libxkbcommon-dev librime-plugin-lua`，
+把仓库的 `Rime/`、`rime-test/` 复制过去（不用带 `.git`），同样跑 `rime-test/tools/check_dv.sh`。
+`gen_dvorak_map` 换成 `gen_dvorak_map_xkb.c`，用 xkbcommon 实测 XKB 的 `us` 和 `us(dvorak)`，
+输出与 macOS 版逐字节相同，所以映射表的核对照常生效。
+想用系统的共享数据（ibus-rime 实际用的那份）跑，加 `RIME_TEST_SHARED=/usr/share/rime-data`。
 
 check_dv.sh 依次：`build.sh` 编译驱动 `rime_dvtest` 和 `gen_dvorak_map`；
 `make_users.sh` 从 `Rime/` 生成两个测试用户目录并部署（`user-dv` 是原样，
@@ -120,6 +128,42 @@ rime-test/tools/run_case.sh rime-test/user-dv /dev/null --dvorak a a a b   # 键
 
 run_case.sh 在临时克隆里跑，不改 `user-dv`；直接调用 `rime-test/bin/rime_dvtest` 会把会话写入留在用户目录里。
 
+## Linux（ibus-rime）
+
+在 Debian 13 arm64 + GNOME 48（Wayland）+ ibus-rime 1.5.1 / librime 1.13.1 上跑通。
+`Rime/` 是两边共用的配置；`squirrel.custom.yaml` 只用于 Mac，同步到 Linux 时排除；
+Linux 专属的放在 `linux/`：`ibus_rime.custom.yaml`（候选竖排、编码不嵌入）和 `deploy.sh`。
+
+1. 安装：
+
+   ```sh
+   sudo apt install --no-install-recommends ibus-rime librime-plugin-lua librime-bin libopencc-data rsync
+   ```
+
+   `libopencc-data` 提供繁简转换的 `s2t.json`（Debian 的 rime 包里没有）。
+
+2. 在 Mac 的仓库根目录同步并重启 ibus（被覆盖的旧文件挪到 `~/.config/ibus/rime.backup-<时间>`）：
+
+   ```sh
+   linux/deploy.sh 用户@主机
+   ```
+
+   切到 Rime 时 ibus-rime 自动部署，日志在 `/tmp/rime.ibus.*`。
+
+3. 输入源：设置 → 键盘 → 输入源，依次是“英语（Dvorak）”和“中文（Rime）”。
+   Rime 引擎的布局是 `default`，GNOME 会沿用前一个 XKB 布局，所以 Rime 收到的是德沃夏克字符，
+   和 Mac 上 `keyboard_layout: Dvorak` 一样，`dvorak_remap.lua` 不用改。
+
+4. 字体：把 `98WB-*.otf` 复制到 `~/.local/share/fonts/`，运行 `fc-cache -f`。
+   候选框的字体由 GNOME 主题决定，拆分字根（私用区字符）靠 fontconfig 回退到 98WB。
+   系统里没有别的中文字体时，98WB-1 会成为默认中文字体，最好再装 `fonts-noto-cjk`。
+
+与 Mac 的差异：
+
+- 不能按 App 设默认英文：ibus-rime 不把 App 信息传给 librime（没有 `client_app`），`app_options` 不生效。
+- Debian 的 rime-prelude（`default.yaml` 0.40）把 Tab 绑成按词移动光标；鼠须管带的 0.50 是 Tab 选下一个候选。
+- z 反查的候选注释在 Linux 上是“〔拆分 · 编码〕”，Mac 上只有编码（两边都与德沃夏克无关，原因未查）。
+
 ## 来源说明
 
 - 码表源自 yanhuacuo（见 `Rime/wubi98_ci.schema.yaml`）。其余方案配置、lua 脚本来自 98 五笔资源库
@@ -142,4 +186,4 @@ run_case.sh 在临时克隆里跑，不改 `user-dv`；直接调用 `rime-test/b
   （[OpenCC](https://github.com/BYVoid/OpenCC)，Apache-2.0）。
 - 改了 `Rime/rime.lua` 的 `rv_var`（关键字换成德沃夏克下敲词对应的引擎字母，`week`、`nl`、`jq` 改叫 `day`、`luna`、`term`），
   新增 `rv_show`；`Rime/lua/helper.lua` 帮助里的关键字改读 `rv_show`。各功能的实现没动。
-- 本仓库新增的是德沃夏克映射（`Rime/lua/dvorak_remap.lua` 及各方案 custom.yaml 里的相关配置）和 `rime-test/` 测试环境。
+- 本仓库新增的是德沃夏克映射（`Rime/lua/dvorak_remap.lua` 及各方案 custom.yaml 里的相关配置）、`linux/` 和 `rime-test/` 测试环境。

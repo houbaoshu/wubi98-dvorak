@@ -1,0 +1,10 @@
+# Shift 切中英，按 ibus 的发法（X11 惯例）：按下不带 Shift 掩码，松开带 Release+Shift。
+#   打 aet（编码同 02，由脚本从词典中挑出）后按右 Shift（Shift_R: commit_text）：
+#   首选上屏、编码清掉、切到英文；打 s 不处理（交给应用）；再按右 Shift 切回中文。
+#   再打 aet 后按左 Shift（Shift_L: inline_ascii）：编码保留，临时英文。
+a e t
+Shift_R Release+Shift+Shift_R
+s
+Shift_R Release+Shift+Shift_R
+a e t
+Shift_L Release+Shift+Shift_L

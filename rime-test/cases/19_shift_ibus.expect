@@ -1,0 +1,6 @@
+# 每行（# 开头的除外）须作为整行出现在两侧的 stdout 里
+# 右 Shift：首选上屏，切到英文，编码区清空
+    上屏: "散"
+    状态: schema=wubi98_ci ascii_mode=1 composing=0 full_shape=0
+# 左 Shift：切到英文，编码保留
+    状态: schema=wubi98_ci ascii_mode=1 composing=1 full_shape=0
