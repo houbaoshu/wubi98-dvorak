@@ -226,7 +226,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     # 在 Debian 13 容器里跑，与测试虚拟机相同。Ubuntu 24.04 自带的 librime-plugin-lua
     # （git20230917）没有 KeyEvent(keycode, modifier) 构造，dvorak_remap.lua 在那里不能用
-    # （会话日志 "parse error: unrecognized key '47'"），见 README“Linux”一节。
+    # （会话日志 "parse error: unrecognized key '47'"）。
     container: debian:trixie
     steps:
       # 先只装 curl：引导脚本发现没有 git、rsync 时应打印完整的 apt 命令，不自己执行
