@@ -15,7 +15,7 @@
 # 引擎下次启动时（切到 Rime 输入源），日志在 /tmp/rime.ibus.*。
 #
 # 字体：linux/fontconfig/ 下的配置装到 ~/.config/fontconfig/conf.d/；98WB 字体不在
-# 仓库里，在远端执行 linux/install-fonts.sh 从原仓库下载安装（已装好就跳过），
+# 仓库里，在远端执行 fonts/install-fonts.sh 从原仓库下载安装（已装好就跳过），
 # 它最后运行 fc-cache -f。GNOME 的候选框由 gnome-shell 画，它只在启动时读字体列表，
 # 字体或这份配置有变化时要注销重新登录。
 set -eu
@@ -39,7 +39,7 @@ rsync -a --backup --backup-dir="$backup" \
 
 ssh "$host" "mkdir -p .config/fontconfig/conf.d"
 rsync -a "$repo/linux/fontconfig/" "$host:.config/fontconfig/conf.d/"
-ssh "$host" 'sh -s' < "$repo/linux/install-fonts.sh"
+ssh "$host" 'sh -s' < "$repo/fonts/install-fonts.sh"
 
 ssh "$host" "touch $dest && ibus restart"
 echo "已同步到 $host:~/$dest 并重启 ibus；切到 Rime 后部署，日志见 /tmp/rime.ibus.*"
