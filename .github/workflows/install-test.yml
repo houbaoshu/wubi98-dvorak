@@ -82,7 +82,7 @@ jobs:
             kill $pid 2>/dev/null || true
             pid=
           }
-          build_time() { sed -n 's/^ *last_build_time: *//p' "$rime/user.yaml" 2>/dev/null; }
+          build_time() { sed -n 's/^ *last_build_time: *//p' "$rime/user.yaml" 2>/dev/null || true; }
           wait_deploy() {  # wait_deploy 旧值：等 last_build_time 变成别的值，最多 3 分钟
             for i in $(seq 1 90); do
               t=$(build_time)
@@ -146,7 +146,7 @@ jobs:
           echo "更新后重启：编译结果里有 dvorak_remap"
 
           echo "== 3. 鼠须管日志（${logdir}）"
-          ls -la "$logdir"
+          ls -la "$logdir" || true
           infos=$(ls "$logdir"/rime.squirrel.*.log.INFO.*.log 2>/dev/null || true)
           if [ -z "$infos" ]; then
             echo "error: $logdir 下没有鼠须管的 INFO 日志" >&2
