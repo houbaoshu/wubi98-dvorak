@@ -6,7 +6,7 @@
 # 两种方式做的事相同，只是命令在远端还是本机执行。
 #
 # 同步的是 Rime/（共用的配置，不含 Mac 专属的 squirrel.custom.yaml）加上
-# linux/ibus_rime.custom.yaml。排除项与 README 里 Mac 的部署命令相同：
+# linux/ibus_rime.custom.yaml。排除项与 mac/install.sh 的同步相同：
 # 部署产物、同步目录、用户词典和运行时状态都不覆盖。
 # 没有 --delete：Rime/ 里删掉的文件不会从目标目录消失，要手动挪到备份目录。
 # 按校验和比较，只覆盖内容不同的文件（git 切分支会改修改时间，只差时间的不算）；

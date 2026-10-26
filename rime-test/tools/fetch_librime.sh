@@ -1,6 +1,6 @@
 #!/bin/sh
 # macOS：下载 librime 1.16.0（a251145，与鼠须管 1.1.2 同版本）发布包，按记录的
-# SHA-256 校验后解压到 vendor/，得到 vendor/dist（README“跑测试”第 1 步）。
+# SHA-256 校验后解压到 vendor/，得到 vendor/dist，供 build.sh 链接（check_dv.sh 会先调用 build.sh）。
 # 已解压过（vendor/dist/lib/librime.1.dylib 在）就跳过；已下载且校验相同就不再下载。
 # Linux 用系统的 librime，不需要这一步。
 set -eu
