@@ -1,5 +1,7 @@
 # 98 五笔 + 德沃夏克（鼠须管 / Rime）
 
+[![安装测试](https://github.com/houbaoshu/wubi98-dvorak/actions/workflows/install-test.yml/badge.svg)](https://github.com/houbaoshu/wubi98-dvorak/actions/workflows/install-test.yml)
+
 系统键盘布局固定为德沃夏克，只留鼠须管一个输入源：英文按德沃夏克打，
 中文按物理 QWERTY 键位打 98 五笔，不用来回切换系统输入源。
 
@@ -51,6 +53,7 @@ mac/install.sh
 - 系统键盘布局保持“Dvorak”（英语）。
 - 候选框里的拆分字根显示成方块时，重新登录一次。
 
+加 `--yes` 时，需要装鼠须管就直接运行 `sudo installer`，不等回车（CI 用，平时不加）。
 先在临时目录里试同步和备份（目标不是 `~/Library/Rime` 时不触发重新部署）：
 
 ```sh
@@ -123,11 +126,10 @@ macOS 和 Linux 上都能跑。macOS 上用与鼠须管 1.1.2 同版本的 libri
 macOS：
 
 1. 下载 [librime 1.16.0 发布页](https://github.com/rime/librime/releases/tag/1.16.0)
-   的 `rime-a251145-macOS-universal.tar.bz2`，放到 `rime-test/vendor/dl/`，解压到 `rime-test/vendor/`：
+   的 `rime-a251145-macOS-universal.tar.bz2`，按记录的 SHA-256 校验后解压到 `rime-test/vendor/`：
 
    ```sh
-   mkdir -p rime-test/vendor/dl
-   tar xjf rime-test/vendor/dl/rime-a251145-macOS-universal.tar.bz2 -C rime-test/vendor
+   rime-test/tools/fetch_librime.sh
    ```
 
    解压后应有 `rime-test/vendor/dist/lib/librime.1.dylib` 和
@@ -169,6 +171,16 @@ rime-test/tools/run_case.sh rime-test/user-dv /dev/null --dvorak a a a b   # 键
 
 run_case.sh 在临时克隆里跑，不改 `user-dv`；直接调用 `rime-test/bin/rime_dvtest` 会把会话写入留在用户目录里。
 
+## CI
+
+GitHub Actions（`.github/workflows/install-test.yml`）在全新的 macOS（`macos-26`）和 Linux
+（`ubuntu-24.04-arm` runner 上的 Debian 13 容器，原因见“Linux”一节）上从零跑一遍安装
+（Mac 用 `mac/install.sh --yes`，Linux 用 apt 装包再 `linux/deploy.sh --local`），核对鼠须管版本、
+字体校验和、配置与 `Rime/` 一致；两边都用 `rime_deployer` 部署（macOS 上用与鼠须管同版本的 librime、
+鼠须管自带的共享数据），开会话确认 Lua 插件加载，日志里不能有 E/F 级，最后跑 `check_dv.sh`。
+没验证的：实际打字和候选框显示（runner 上没有人按键，也没有接收输入的前台 App）、在系统设置里添加输入源。
+鼠须管自己的部署和 `--reload` 只记录不判定：装完后系统不会拉起鼠须管，直接启动它在 runner 上时灵时不灵。
+
 ## Linux（ibus-rime）
 
 在 Debian 13 arm64 + GNOME 48（Wayland）+ ibus-rime 1.5.1 / librime 1.13.1 上跑通。
@@ -184,11 +196,17 @@ Linux 专属的放在 `linux/`：`ibus_rime.custom.yaml`（候选竖排、编码
 
    `libopencc-data` 提供繁简转换的 `s2t.json`（Debian 的 rime 包里没有）。
 
+   Ubuntu 24.04 的包名相同，但版本太旧（librime 1.10、librime-plugin-lua git20230917），
+   librime-lua 没有 `KeyEvent(keycode, modifier)` 构造，`dvorak_remap.lua` 每次转换都报
+   `parse error: unrecognized key '47'`，中文模式下的德沃夏克转换不能用。所以 CI 也在 Debian 13 容器里跑。
+
 2. 在 Mac 的仓库根目录同步并重启 ibus（被覆盖的旧文件挪到 `~/.config/ibus/rime.backup-<时间>`）：
 
    ```sh
    linux/deploy.sh 用户@主机
    ```
+
+   在 Linux 本机的仓库里运行 `linux/deploy.sh --local`，做的事相同（CI 用这个）。
 
    切到 Rime 时 ibus-rime 自动部署，日志在 `/tmp/rime.ibus.*`。
    脚本同时把 `linux/fontconfig/` 装到 `~/.config/fontconfig/conf.d/`，并在远端执行
